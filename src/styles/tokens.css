@@ -1,0 +1,103 @@
+/* Design tokens: Astrikos reference UI (charcoal dark default, light option, Inter, blue actions, purple AI).
+   Existing token names (--bg, --surface, --ink ...) are kept so every page restyles without code changes.
+   Contrast notes (WCAG AA, 4.5:1 for small text): white on --btn 5.1, white on --advisory 5.7, white on --crit-solid 4.8 (dark) / 6.5 (light),
+   --crit on its tint 5.7 (dark), --good / --warn / --s8 on their light tints 5.6 / 5.4 / 5.2. */
+:root,
+:root[data-theme="dark"] {
+  --bg: #1c1c1c;
+  --surface: #0f0f10;
+  --surface-2: #232325;
+  --chrome: #1c1c1c;
+  --ink: #e8eef5;
+  --ink-2: #afc3d8;
+  --ink-3: #8ca0b6;
+  --border: rgba(255, 255, 255, 0.09);
+  --card-border: rgba(255, 255, 255, 0.04);
+  --accent: #3b7de8;
+  --accent-strong: #7fa8f0;
+  --accent-soft: rgba(59, 125, 232, 0.14);
+  --btn: #2d6ad4;
+  --btn-hover: #2459b8;
+  --advisory: #7c3aed;
+  --advisory-strong: #6d28d9;
+  --good: #22c55e;
+  --good-solid: #15803d; /* fill behind white text: 5.0:1 */
+  --good-soft: rgba(34, 197, 94, 0.14);
+  --warn: #f59e0b;
+  --warn-soft: rgba(245, 158, 11, 0.14);
+  --crit: #f87171;
+  --crit-solid: #dc2626;
+  --crit-soft: rgba(239, 68, 68, 0.14);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.4);
+  --overlay: rgba(0, 0, 0, 0.55);
+  --s1: #3b7de8;
+  --s2: #f59e0b;
+  --s3: #10b981;
+  --s4: #a78bfa;
+  --s5: #ef4444;
+  --s6: #94a3b8;
+  --s7: #ec4899;
+  --s8: #0ea5e9;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f1f5fa;
+  --surface: #ffffff;
+  --surface-2: #edf1f8;
+  --chrome: #ffffff;
+  --ink: #0d1117;
+  --ink-2: #2f3b4a;
+  --ink-3: #5b6878;
+  --border: rgba(15, 35, 75, 0.12);
+  --card-border: rgba(15, 35, 75, 0.09);
+  --accent: #3b6dbf;
+  --accent-strong: #2d5ca8;
+  --accent-soft: rgba(59, 109, 191, 0.1);
+  --btn: #2d6ad4;
+  --btn-hover: #2459b8;
+  --advisory: #7c3aed;
+  --advisory-strong: #6d28d9;
+  --good: #136b34;
+  --good-solid: #136b34;
+  --good-soft: rgba(21, 128, 61, 0.11);
+  --warn: #9a4707;
+  --warn-soft: rgba(194, 65, 12, 0.11);
+  --crit: #b91c1c;
+  --crit-solid: #b91c1c;
+  --crit-soft: rgba(185, 28, 28, 0.11);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.12);
+  --overlay: rgba(20, 35, 55, 0.5);
+  --s1: #3b6dbf;
+  --s2: #d97706;
+  --s3: #059669;
+  --s4: #7c3aed;
+  --s5: #dc2626;
+  --s6: #64748b;
+  --s7: #db2777;
+  --s8: #02699f;
+  color-scheme: light;
+}
+
+:root {
+  --font-display: 'Inter', 'Segoe UI', Arial, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', Consolas, 'Courier New', monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --sidebar-w: 244px;
+  --header-h: 62px;
+}

@@ -1,0 +1,44 @@
+/* Login screen. Uses the shared tokens, so it follows the saved dark / light theme. */
+.login { display: flex; min-height: 100vh; background: var(--bg); color: var(--ink); }
+
+.login-brand { flex: 1 1 46%; max-width: 640px; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: 40px 48px; color: #f2f6fb; background: radial-gradient(900px 520px at 0% 0%, rgba(14, 165, 233, 0.35), transparent 60%), radial-gradient(800px 560px at 100% 100%, rgba(124, 58, 237, 0.4), transparent 60%), #0b1220; }
+.login-brand-top { display: flex; align-items: center; gap: 12px; }
+.login-brand .brand-text span { color: #9fb2c8; }
+.login-brand h2 { font-size: 34px; line-height: 1.15; margin: 0 0 24px; max-width: 420px; }
+.login-brand ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.login-brand li { display: flex; align-items: flex-start; gap: 10px; font-size: 14.5px; line-height: 1.4; color: #cfdbe8; }
+.login-brand li svg { flex-shrink: 0; margin-top: 2px; color: #7fa8f0; }
+.login-brand-foot { font-size: 12px; color: #8ca0b6; }
+
+.login-panel { flex: 1 1 54%; display: flex; align-items: center; justify-content: center; padding: 32px 24px; }
+.login-card { width: 100%; max-width: 420px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); padding: 32px 32px 24px; display: flex; flex-direction: column; }
+.login-card-mark { display: none; }
+.login-card h1 { font-size: 26px; margin: 0; }
+.login-sub { margin: 2px 0 22px; color: var(--ink-3); font-size: 13.5px; }
+.login-card label { font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 0 0 6px; }
+.login-card input { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px; font-size: 14px; margin-bottom: 16px; }
+.login-card input:focus { border-color: var(--accent); outline: none; }
+.login-pw { position: relative; }
+.login-pw input { padding-right: 64px; }
+.login-pw-toggle { position: absolute; right: 6px; top: 6px; height: 32px; padding: 0 10px; background: transparent; border: 0; border-radius: 6px; color: var(--accent-strong); font-size: 12px; font-weight: 600; cursor: pointer; }
+.login-pw-toggle:hover { background: var(--accent-soft); }
+.login-error { min-height: 18px; margin: -6px 0 10px; font-size: 12.5px; color: var(--crit); }
+.login-submit { width: 100%; justify-content: center; padding: 12px 14px; font-size: 14.5px; font-weight: 700; }
+
+.login-demo { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); }
+.login-demo-head { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; font-size: 12px; color: var(--ink-3); }
+.login-demo-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.login-demo-item { display: flex; flex-direction: column; gap: 1px; text-align: left; padding: 8px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--ink); cursor: pointer; font: inherit; }
+.login-demo-item strong { font-size: 12.5px; font-weight: 600; }
+.login-demo-item span { font-size: 11px; color: var(--ink-3); }
+.login-demo-item:hover { border-color: var(--accent); }
+.login-demo-item.is-on { border-color: var(--accent); background: var(--accent-soft); }
+
+@media (max-width: 860px) {
+  .login-brand { display: none; }
+  .login-card-mark { display: block; margin-bottom: 14px; }
+}
+@media (max-width: 440px) {
+  .login-card { padding: 24px 18px 18px; }
+  .login-demo-list { grid-template-columns: 1fr; }
+}

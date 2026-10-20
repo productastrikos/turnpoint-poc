@@ -1,0 +1,145 @@
+/* Stand-in consoles for the client's SAP S/4HANA and Primavera P6 (demo only). Scoped by .sapx / .p6x so nothing
+   leaks into TURNPOINT. Both use their own light look on purpose: they must read as a different system. */
+
+.ext-ribbon {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+  padding: 5px 14px; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: 0.02em;
+  background: #fff4d6; color: #6b4e00; border-top: 1px solid #f0d58a; text-align: center;
+}
+
+/* ------------------------------------------------------------------ SAP (Fiori Horizon-like) */
+.sapx { --s-bg: #f5f6f7; --s-shell: #ffffff; --s-ink: #1d2d3e; --s-ink2: #556b82; --s-line: #d9d9d9; --s-blue: #0064d9; --s-blue-soft: #e8f2ff;
+  --s-good: #256f3a; --s-good-soft: #f1fdf6; --s-warn: #aa5808; --s-warn-soft: #fff8d6; --s-crit: #aa0808; --s-crit-soft: #ffeaf4;
+  min-height: 100vh; background: var(--s-bg); color: var(--s-ink); font: 14px/1.45 Inter, "72", system-ui, sans-serif; padding-bottom: 40px; }
+.sapx * { box-sizing: border-box; }
+.sapx-shell { height: 48px; display: flex; align-items: center; gap: 14px; padding: 0 18px; background: var(--s-shell); border-bottom: 1px solid var(--s-line); box-shadow: 0 0 2px rgba(34,53,72,.1); position: sticky; top: 0; z-index: 20; }
+.sapx-logo { display: inline-flex; align-items: center; justify-content: center; height: 26px; padding: 0 8px; border-radius: 4px; background: #354a5f; color: #fff; font-weight: 800; font-size: 12px; letter-spacing: .04em; }
+.sapx-title { font-weight: 700; font-size: 15px; }
+.sapx-sub { color: var(--s-ink2); font-size: 12.5px; }
+.sapx-pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; border: 1px solid var(--s-line); background: #fff; color: var(--s-ink2); }
+.sapx-dot { width: 8px; height: 8px; border-radius: 50%; background: #aaa; }
+.sapx-dot.on { background: #30914c; box-shadow: 0 0 0 3px rgba(48,145,76,.18); }
+.sapx-avatar { width: 30px; height: 30px; border-radius: 50%; background: #5d36ff; color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+.sapx-page { padding: 18px 22px; }
+.sapx-head h1 { margin: 0; font-size: 20px; font-weight: 700; }
+.sapx-head p { margin: 4px 0 0; color: var(--s-ink2); font-size: 13px; }
+.sapx-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+.sapx-kpi { background: #fff; border-radius: 12px; padding: 12px 16px; box-shadow: 0 0 2px rgba(34,53,72,.15), 0 2px 4px rgba(34,53,72,.08); }
+.sapx-kpi .k { font-size: 12px; color: var(--s-ink2); }
+.sapx-kpi .v { font-size: 26px; font-weight: 300; color: var(--s-blue); line-height: 1.2; }
+.sapx-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--s-line); margin-bottom: 0; background: #fff; border-radius: 12px 12px 0 0; padding: 0 12px; }
+.sapx-tab { border: 0; background: none; padding: 12px 14px 10px; font: inherit; font-weight: 600; color: var(--s-ink2); cursor: pointer; border-bottom: 3px solid transparent; }
+.sapx-tab.on { color: var(--s-blue); border-bottom-color: var(--s-blue); }
+.sapx-tab .n { margin-left: 6px; font-weight: 400; }
+.sapx-card { background: #fff; border-radius: 0 0 12px 12px; box-shadow: 0 0 2px rgba(34,53,72,.15), 0 2px 4px rgba(34,53,72,.08); }
+.sapx-toolbar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #eef0f2; }
+.sapx-toolbar .t { font-weight: 700; }
+.sapx-toolbar .grow { flex: 1; }
+.sapx-search { height: 32px; border: 1px solid #bcc3ca; border-radius: 6px; padding: 0 10px; font: inherit; font-size: 13px; width: 260px; background: #fff; color: var(--s-ink); }
+.sapx-btn { height: 32px; padding: 0 14px; border-radius: 8px; border: 1px solid #bcc3ca; background: #fff; color: var(--s-blue); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.sapx-btn:hover { background: #eaecee; }
+.sapx-btn.primary { background: var(--s-blue); border-color: var(--s-blue); color: #fff; }
+.sapx-btn.primary:hover { background: #0057bd; }
+.sapx-btn:disabled { opacity: .5; cursor: default; }
+.sapx-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sapx-table th { text-align: left; font-weight: 600; color: var(--s-ink2); padding: 8px 10px; border-bottom: 1px solid #e5e5e5; background: #fff; white-space: nowrap; position: sticky; top: 48px; z-index: 1; }
+.sapx-table td { padding: 9px 10px; border-bottom: 1px solid #eef0f2; vertical-align: top; }
+.sapx-table tr.click { cursor: pointer; }
+.sapx-table tr.click:hover td { background: #f5faff; }
+.sapx-table tr.flash td { animation: sapx-flash 4.5s ease-out; }
+@keyframes sapx-flash { 0%, 30% { background: #fff4c4; } 100% { background: transparent; } }
+.sapx-link { color: var(--s-blue); font-weight: 600; }
+.sapx-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.5px; }
+.sapx-status { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700; border: 1px solid; }
+.sapx-status.good { color: var(--s-good); background: var(--s-good-soft); border-color: #a5d8b4; }
+.sapx-status.warn { color: var(--s-warn); background: var(--s-warn-soft); border-color: #f5d27e; }
+.sapx-status.crit { color: var(--s-crit); background: var(--s-crit-soft); border-color: #f5b3c8; }
+.sapx-status.info { color: var(--s-blue); background: var(--s-blue-soft); border-color: #a8cdfa; }
+.sapx-status.none { color: var(--s-ink2); background: #f5f6f7; border-color: #d9d9d9; }
+.sapx-tpref { font-size: 11.5px; color: #5d36ff; font-weight: 600; }
+.sapx-overlay { position: fixed; inset: 0; background: rgba(29,45,62,.35); display: grid; place-items: center; z-index: 60; }
+.sapx-dialog { width: 640px; max-width: 94vw; background: #fff; border-radius: 12px; box-shadow: 0 10px 30px rgba(34,53,72,.25); overflow: hidden; }
+.sapx-dialog header { padding: 14px 18px; border-bottom: 1px solid #eef0f2; font-weight: 700; font-size: 16px; }
+.sapx-dialog .body { padding: 16px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+.sapx-dialog .body .full { grid-column: 1 / -1; }
+.sapx-dialog label { display: block; font-size: 12px; color: var(--s-ink2); margin-bottom: 4px; }
+.sapx-dialog input, .sapx-dialog select { width: 100%; height: 34px; border: 1px solid #bcc3ca; border-radius: 6px; padding: 0 10px; font: inherit; font-size: 13.5px; color: var(--s-ink); background: #fff; }
+.sapx-dialog footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; background: #f5f6f7; border-top: 1px solid #eef0f2; }
+.sapx-hint { font-size: 12px; color: var(--s-ink2); }
+.sapx-empty { padding: 26px; text-align: center; color: var(--s-ink2); }
+
+/* ------------------------------------------------------------------ P6 (EPPM-like) */
+.p6x { --p-bg: #eef1f4; --p-head: #263746; --p-ink: #1f2933; --p-ink2: #5b6b79; --p-line: #cfd6dd; --p-wbs: #f3ead0; --p-crit: #d0312d; --p-rem: #3a7bd5; --p-act: #2e9e5b; --p-sel: #dbe9ff;
+  min-height: 100vh; background: var(--p-bg); color: var(--p-ink); font: 13px/1.4 Inter, system-ui, sans-serif; padding-bottom: 40px; }
+.p6x * { box-sizing: border-box; }
+.p6x-head { height: 44px; display: flex; align-items: center; gap: 14px; padding: 0 16px; background: var(--p-head); color: #e9eef3; }
+.p6x-brand { font-weight: 800; letter-spacing: .02em; }
+.p6x-brand small { font-weight: 500; opacity: .75; margin-left: 6px; }
+.p6x-head .grow { flex: 1; }
+.p6x-chip { padding: 2px 9px; border-radius: 999px; background: rgba(255,255,255,.12); font-size: 11.5px; }
+.p6x-dot { width: 8px; height: 8px; border-radius: 50%; background: #888; display: inline-block; margin-right: 6px; }
+.p6x-dot.on { background: #4cd07d; }
+.p6x-bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; background: #fff; border-bottom: 1px solid var(--p-line); flex-wrap: wrap; }
+.p6x-bar .grow { flex: 1; }
+.p6x-btn { height: 30px; padding: 0 12px; border-radius: 4px; border: 1px solid #b8c2cc; background: #f7f9fb; color: var(--p-ink); font: inherit; font-weight: 600; cursor: pointer; }
+.p6x-btn:hover { background: #e9eef3; }
+.p6x-btn.primary { background: #1f6fd1; border-color: #1f6fd1; color: #fff; }
+.p6x-btn.primary:hover { background: #185ab0; }
+.p6x-btn.warn { box-shadow: 0 0 0 3px rgba(240,160,40,.45); }
+.p6x-note { font-size: 12px; color: var(--p-ink2); }
+.p6x-note.warn { color: #9a5b00; font-weight: 600; }
+.p6x-main { display: grid; grid-template-columns: 1fr; gap: 0; }
+.p6x-grid { background: #fff; border-bottom: 1px solid var(--p-line); overflow-x: auto; }
+.p6x-row { display: grid; grid-template-columns: 96px minmax(230px, 1.4fr) 66px 72px 64px 98px 84px 76px minmax(420px, 2fr); align-items: center; min-height: 26px; border-bottom: 1px solid #edf0f3; }
+.p6x-row > div { padding: 3px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.p6x-row.head { position: sticky; top: 0; z-index: 2; background: #e3e8ee; font-weight: 700; font-size: 11.5px; color: #34424f; border-bottom: 1px solid var(--p-line); }
+.p6x-row.wbs { background: var(--p-wbs); font-weight: 700; }
+.p6x-row.act { cursor: pointer; }
+.p6x-row.act:hover { background: #f6f9ff; }
+.p6x-row.sel { background: var(--p-sel); }
+.p6x-row.dirty > div:first-child { box-shadow: inset 3px 0 0 #f0a028; }
+.p6x-row.flash { animation: p6x-flash 4.5s ease-out; }
+@keyframes p6x-flash { 0%, 30% { background: #fff4c4; } 100% { background: transparent; } }
+.p6x-num { text-align: right; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; }
+.p6x-neg { color: var(--p-crit); font-weight: 700; }
+.p6x-edit { width: 54px; height: 22px; border: 1px solid #1f6fd1; border-radius: 3px; text-align: right; font: 12px "IBM Plex Mono", monospace; padding: 0 4px; }
+.p6x-gantt { position: relative; height: 26px; padding: 0 !important; overflow: visible !important; }
+.p6x-gbar { position: absolute; top: 7px; height: 12px; border-radius: 2px; }
+.p6x-gbar.rem { background: var(--p-rem); }
+.p6x-gbar.crit { background: var(--p-crit); }
+.p6x-gbar.done { background: var(--p-act); }
+.p6x-gbar.base { top: 20px; height: 3px; background: #a9b4bf; border-radius: 0; }
+.p6x-ms { position: absolute; top: 6px; width: 12px; height: 12px; transform: rotate(45deg); background: #1f2933; }
+.p6x-ms.crit { background: var(--p-crit); }
+.p6x-dd { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed #e09a00; z-index: 1; }
+.p6x-scale { position: relative; height: 26px; }
+.p6x-scale span { position: absolute; top: 6px; font-size: 10.5px; color: #4a5866; transform: translateX(-50%); }
+.p6x-lower { display: grid; grid-template-columns: 1fr 1fr; gap: 0; background: #fff; border-top: 1px solid var(--p-line); }
+.p6x-panel { padding: 10px 16px; border-right: 1px solid var(--p-line); min-height: 180px; }
+.p6x-panel h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #34424f; }
+.p6x-kv { display: grid; grid-template-columns: 150px 1fr; gap: 3px 10px; font-size: 12.5px; }
+.p6x-kv dt { color: var(--p-ink2); }
+.p6x-kv dd { margin: 0; }
+.p6x-log { font-size: 12px; max-height: 210px; overflow-y: auto; }
+.p6x-log div { padding: 4px 0; border-bottom: 1px solid #edf0f3; }
+.p6x-in { color: #5d36ff; font-weight: 700; }
+.p6x-out { color: #1f6fd1; font-weight: 700; }
+
+/* ------------------------------------------------------------------ split view */
+.splitx { height: 100vh; display: grid; grid-template-rows: 40px auto 1fr; background: #0b1220; }
+.splitx-bar { display: flex; align-items: center; gap: 10px; padding: 0 12px; color: #cfd8e3; font: 600 12.5px Inter, system-ui, sans-serif; }
+.splitx-bar select { height: 26px; border-radius: 5px; border: 1px solid #334155; background: #111827; color: #e5e7eb; font: inherit; }
+.splitx-panes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 6px 6px; min-height: 0; }
+.splitx-pane { position: relative; overflow: hidden; border-radius: 6px; background: #000; }
+.splitx-pane iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; }
+
+.splitx-demo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 12px 8px; font: 600 12px Inter, system-ui, sans-serif; color: #cfd8e3; }
+.splitx-demo-title { opacity: .7; margin-right: 4px; }
+.splitx-btn { height: 28px; padding: 0 12px; border-radius: 6px; border: 1px solid transparent; font: inherit; cursor: pointer; color: #fff; }
+.splitx-btn.sap { background: #0064d9; }
+.splitx-btn.sap:hover { background: #0057bd; }
+.splitx-btn.p6 { background: #b4531a; }
+.splitx-btn.p6:hover { background: #9a4514; }
+.splitx-btn.reset { background: transparent; border-color: #475569; color: #cfd8e3; }
+.splitx-btn.reset:hover { background: #1e293b; }
+.splitx-last { margin-left: 6px; font-weight: 500; opacity: .8; }

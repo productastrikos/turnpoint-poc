@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "react",
+    "typescript",
+    "oxc"
+  ],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/only-export-components": [
+      "warn",
+      {
+        "allowConstantExport": true
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/app/*Context.tsx",
+        "src/app/GuidedDemo.tsx",
+        "src/app/routes.tsx",
+        "src/components/ui/Tabs.tsx",
+        "src/components/ui/StatusChip.tsx",
+        "src/components/ui/FormDialog.tsx"
+      ],
+      "rules": {
+        "react/only-export-components": "off"
+      }
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+import { Card, CardHeader } from '../../components/ui/Card';
+import { Chip } from '../../components/ui/Chip';
+import { ActionButton } from '../../components/ui/ActionButton';
+import { ArchDiagram } from './ArchDiagram';
+import { useHub, useTick } from './useHub';
+import { SYNC_STEPS, errorQueue, relativeTime, runSync, type SystemHealth } from '../../services/integrationService';
+import { useToast } from '../../app/ToastContext';
+
+function HealthCard({ title, sub, h, errors, color }: { title: string; sub: string; h: SystemHealth; errors: number; color: string }) {
+  return (
+    <Card>
+      <div className="spread" style={{ marginBottom: 12 }}>
+        <div>
+          <h3 style={{ fontSize: 17 }}>{title}</h3>
+          <div className="small muted">{sub}</div>
+        </div>
+        <Chip tone={h.status === 'Connected' ? 'good' : h.status === 'Syncing' ? 'warn' : 'crit'}>{h.status === 'Connected' ? 'Connected (simulated)' : h.status}</Chip>
+      </div>
+      <div className="grid grid-3" style={{ gap: 10 }}>
+        <div className="card-flat"><div className="eyebrow">Last sync</div><div className="mono" style={{ fontWeight: 600 }}>{relativeTime(h.lastSyncAt)}</div></div>
+        <div className="card-flat"><div className="eyebrow">Next scheduled</div><div className="mono" style={{ fontWeight: 600 }}>in {h.nextSyncMin} min</div></div>
+        <div className="card-flat"><div className="eyebrow">Messages today</div><div className="mono" style={{ fontWeight: 600 }}>{h.messagesToday}</div></div>
+        <div className="card-flat"><div className="eyebrow">Error queue</div><div className="mono tone-text-crit" style={{ fontWeight: 600, color: errors ? color : undefined }}>{errors}</div></div>
+        <div className="card-flat"><div className="eyebrow">Avg latency</div><div className="mono" style={{ fontWeight: 600 }}>{h.latencyMs} ms</div></div>
+        <div className="card-flat"><div className="eyebrow">Mode</div><div style={{ fontWeight: 600, fontSize: 12.5 }}>Event + 15 min schedule</div></div>
+      </div>
+    </Card>
+  );
+}
+
+export function OverviewTab() {
+  const hub = useHub();
+  useTick(10_000);
+  const { showToast } = useToast();
+  const errs = errorQueue(hub.messages);
+  const p6Err = errs.filter((m) => m.system === 'P6').length;
+  const sapErr = errs.filter((m) => m.system === 'SAP').length;
+
+  async function sync() {
+    const r = await runSync();
+    showToast(`Sync complete (simulated): ${r.p6Msgs} P6 and ${r.sapMsgs} SAP messages exchanged`, 'good');
+  }
+
+  return (
+    <div className="stack" style={{ gap: 16 }}>
+      <Card>
+        <CardHeader
+          title="Architecture"
+          action={
+            <ActionButton variant="primary" small={false} busy={hub.running} onClick={sync}>
+              Sync now
+            </ActionButton>
+          }
+        />
+        <ArchDiagram running={hub.running} />
+      </Card>
+
+      {(hub.running || hub.step >= SYNC_STEPS.length) && (
+        <Card>
+          <CardHeader title="Sync run" action={<span className="mono small muted">{hub.running ? `step ${hub.step + 1} of ${SYNC_STEPS.length}` : 'complete'}</span>} />
+          <ol style={{ margin: 0, paddingLeft: 0, listStyle: 'none' }}>
+            {SYNC_STEPS.map((s, i) => {
+              const done = hub.step > i || hub.step >= SYNC_STEPS.length;
+              const active = hub.running && hub.step === i;
+              return (
+                <li key={s} className="list-row" style={{ opacity: done || active ? 1 : 0.45 }}>
+                  <span>
+                    <span className="mono" style={{ display: 'inline-block', width: 24, color: done ? 'var(--good)' : 'var(--ink-3)' }}>{done ? '✓' : active ? '…' : i + 1}</span>
+                    {s}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </Card>
+      )}
+
+      <div className="grid grid-2">
+        <HealthCard title="Primavera P6" sub="v24.21 UAT · XER file and REST API" h={hub.p6} errors={p6Err} color="var(--crit)" />
+        <HealthCard title="SAP S/4HANA 2025" sub="PM · MM · PS via SAP Integration Suite (CPI)" h={hub.sap} errors={sapErr} color="var(--crit)" />
+      </div>
+
+      <Card>
+        <CardHeader title="Security and access (SOW 19.17)" />
+        <div className="row-wrap">
+          <Chip tone="good">OAuth 2.0</Chip>
+          <Chip tone="good">Client certificate (mTLS)</Chip>
+          <Chip tone="good">TLS 1.3 in transit</Chip>
+          <Chip tone="good">Active Directory SSO</Chip>
+          <Chip tone="accent">SAP-certified mechanisms: OData, REST, Integration Suite</Chip>
+          <Chip tone="accent">Clean core: no custom code inside S/4HANA</Chip>
+          <Chip tone="accent">Event-driven plus periodic sync</Chip>
+        </div>
+        <p className="small muted" style={{ margin: '12px 0 0' }}>
+          No live connection: these controls describe the intended production design. This page, the monitoring log and every sync result are generated by the demo.
+        </p>
+      </Card>
+    </div>
+  );
+}

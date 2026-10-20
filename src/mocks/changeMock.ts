@@ -1,0 +1,82 @@
+import type { ChangeRequest } from '../types';
+
+export const changeRequests: ChangeRequest[] = [
+  {
+    id: 'MOC-101',
+    title: 'Add nozzle inspection scope on V-102',
+    description: 'Corrosion found on adjacent line during walkdown; extend inspection scope to V-102 nozzles.',
+    requestedBy: 'A. Hinai',
+    discipline: 'Inspection',
+    state: 'draft',
+    impact: 'medium',
+    auditTrail: [{ state: 'draft', at: '2026-08-15T09:10:00', by: 'A. Hinai' }],
+  },
+  {
+    id: 'MOC-102',
+    title: 'Change lifting plan for E-204 bundle pull',
+    description: 'Crane clearance issue identified; revised rigging and crane position required.',
+    requestedBy: 'R. Fernandes',
+    discipline: 'Rotating Equipment',
+    state: 'under-review',
+    impact: 'high',
+    auditTrail: [
+      { state: 'draft', at: '2026-08-14T08:00:00', by: 'R. Fernandes' },
+      { state: 'under-review', at: '2026-08-15T11:20:00', by: 'R. Fernandes', note: 'Submitted for HSE + Ops review' },
+    ],
+  },
+  {
+    id: 'MOC-103',
+    title: 'Swap gasket material — PTFE to spiral wound',
+    description: 'Original PTFE gaskets unavailable in required size; propose spiral-wound equivalent.',
+    requestedBy: 'K. Rao',
+    discipline: 'Process',
+    state: 'approved',
+    impact: 'low',
+    auditTrail: [
+      { state: 'draft', at: '2026-08-12T07:40:00', by: 'K. Rao' },
+      { state: 'under-review', at: '2026-08-12T14:00:00', by: 'K. Rao' },
+      { state: 'approved', at: '2026-08-13T09:15:00', by: 'Head of Turnaround Services', note: 'Approved — material equivalence confirmed by Process Eng.' },
+    ],
+  },
+  {
+    id: 'MOC-104',
+    title: 'Extend scaffold near CP1 workfront',
+    description: 'Additional scaffold bay required to reach R-101 manway 3; overlaps critical path access.',
+    requestedBy: 'M. Al-Balushi',
+    discipline: 'Civil',
+    state: 'under-review',
+    impact: 'medium',
+    auditTrail: [
+      { state: 'draft', at: '2026-08-15T06:30:00', by: 'M. Al-Balushi' },
+      { state: 'under-review', at: '2026-08-15T13:05:00', by: 'M. Al-Balushi' },
+    ],
+  },
+  {
+    id: 'MOC-105',
+    title: 'Reroute temporary power to C-301 workfront',
+    description: 'Original cable route obstructs equipment laydown; reroute via north corridor.',
+    requestedBy: 'T. Said',
+    discipline: 'Electrical',
+    state: 'rejected',
+    impact: 'low',
+    auditTrail: [
+      { state: 'draft', at: '2026-08-11T10:00:00', by: 'T. Said' },
+      { state: 'under-review', at: '2026-08-11T15:40:00', by: 'T. Said' },
+      { state: 'rejected', at: '2026-08-12T09:00:00', by: 'Head of Turnaround Services', note: 'Route crosses active crane radius — resubmit with alternate path' },
+    ],
+  },
+  {
+    id: 'MOC-106',
+    title: 'Freeze scope — instrument loop QC-2201',
+    description: 'Pending vendor clarification; freeze until spec confirmed.',
+    requestedBy: 'S. Kumar',
+    discipline: 'Instrumentation',
+    state: 'frozen',
+    impact: 'medium',
+    auditTrail: [
+      { state: 'draft', at: '2026-08-10T09:00:00', by: 'S. Kumar' },
+      { state: 'under-review', at: '2026-08-10T16:00:00', by: 'S. Kumar' },
+      { state: 'frozen', at: '2026-08-11T08:30:00', by: 'TA Event Manager', note: 'On hold pending vendor spec' },
+    ],
+  },
+];
