@@ -1,5 +1,5 @@
 // Standalone TURNPOINT backend for the astrikos.xyz deployment: REST (and any future websocket upgrade) on ONE port.
-//   PORT=4303 pm2 start server/index.mjs --name turnpoint_be_4303
+//   PORT=4339 pm2 start server/index.mjs --name turnpoint_be_4339
 // Reads PORT (required in production), HOST (default 127.0.0.1, nginx proxies to it), ANTHROPIC_API_KEY, SAP_API_KEY,
 // CORS_ORIGIN, RATE_LIMIT_PER_MIN. Secrets come from server/.env or .env.local (both git-ignored) or the process env.
 import { createServer } from 'node:http';
@@ -13,7 +13,7 @@ for (const f of ['.env', '.env.local']) {
   }
 }
 
-const PORT = Number(process.env.PORT) || 4303;
+const PORT = Number(process.env.PORT) || 4339;
 const HOST = process.env.HOST || '127.0.0.1';
 const handle = relay(process.env, { cors: true });
 

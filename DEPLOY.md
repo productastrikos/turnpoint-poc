@@ -1,12 +1,12 @@
 # TURNPOINT: deployment (astrikos.xyz)
 
-Follows `deployment_context.md` (two ports, two nginx files). Ports are the next free pair in that file's registry
-(after dso 3301 / 4301). **Check the registry before deploying, then add the row `turnpoint | 3303 | 4303 | live`.**
+Follows `deployment_context.md` (two ports, two nginx files). Ports are the pair assigned to this POC (frontend 3339,
+backend 4339; same last two digits, as the convention requires). **Check the registry before deploying, then add the row `turnpoint | 3339 | 4339 | live`.**
 
 | Thing | Value |
 | --- | --- |
-| Frontend | static SPA (`dist/`), port **3303**, `https://turnpoint.astrikos.xyz:8443`, pm2 `turnpoint_3303` |
-| Backend | `server/index.mjs` (Node, no extra deps), port **4303**, `https://turnpoint-api.astrikos.xyz:8443`, pm2 `turnpoint_be_4303` |
+| Frontend | static SPA (`dist/`), port **3339**, `https://turnpoint.astrikos.xyz:8443`, pm2 `turnpoint_3339` |
+| Backend | `server/index.mjs` (Node, no extra deps), port **4339**, `https://turnpoint-api.astrikos.xyz:8443`, pm2 `turnpoint_be_4339` |
 
 The backend is only the key-holding relay for the AI assistant (`/api/anthropic/v1/messages`) and the SAP sandbox
 tab (`/api/sap/...`), plus `/api/relay/status`. REST and any websocket upgrade share the one port. There is no socket
@@ -33,14 +33,14 @@ git clone <repo> turnpoint && cd turnpoint
 
 # Frontend
 npm install && npm run build                       # tsc -b + vite build -> dist/
-pm2 start serve --name "turnpoint_3303" -- ./dist -s -p 3303
+pm2 start serve --name "turnpoint_3339" -- ./dist -s -p 3339
 
 # Backend (needs Node 20.12+; create .env.local first if you want the keys)
-PORT=4303 pm2 start server/index.mjs --name "turnpoint_be_4303"
+PORT=4339 pm2 start server/index.mjs --name "turnpoint_be_4339"
 
 pm2 save
 ```
-Update: `git pull && npm install && npm run build && pm2 restart turnpoint_3303 turnpoint_be_4303`.
+Update: `git pull && npm install && npm run build && pm2 restart turnpoint_3339 turnpoint_be_4339`.
 
 ## nginx
 `/etc/nginx/conf/astrikos.conf` (frontend):
@@ -52,7 +52,7 @@ server {
     server_name turnpoint.astrikos.xyz;
     location / {
         add_header 'Access-Control-Allow-Origin' '*' always;
-        proxy_pass http://127.0.0.1:3303;
+        proxy_pass http://127.0.0.1:3339;
     }
 }
 ```
@@ -65,7 +65,7 @@ server {
     ssl_certificate_key /etc/certs/astrikos.xyz/privkey.pem;
     server_name turnpoint-api.astrikos.xyz;
     location / {
-        proxy_pass http://127.0.0.1:4303;
+        proxy_pass http://127.0.0.1:4339;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;

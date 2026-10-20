@@ -30,7 +30,7 @@ The **EN / العربية** switch is on the login card and in the top bar; the 
 
 ### Deploying to astrikos.xyz
 
-See **`DEPLOY.md`** (ports 3303 / 4303, pm2, nginx, Cloudflare). The deployed build needs `server/index.mjs` for the assistant and SAP card; everything else is static.
+See **`DEPLOY.md`** (ports 3339 / 4339, pm2, nginx, Cloudflare). The deployed build needs `server/index.mjs` for the assistant and SAP card; everything else is static.
 
 ### Optional keys (`.env.local`)
 
