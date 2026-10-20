@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLang } from '../i18n/lang';
 import { useNavigate } from 'react-router-dom';
 
 interface Step {
@@ -23,6 +24,7 @@ export const DEMO_STEPS: Step[] = [
 ];
 
 export function GuidedDemoButton() {
+  const { t } = useLang();
   const [step, setStep] = useState<number | null>(null);
   const navigate = useNavigate();
 
@@ -35,7 +37,7 @@ export function GuidedDemoButton() {
   return (
     <>
       <button className="btn btn-ghost" onClick={() => go(step === null ? 0 : null)} title="Walk through the end-to-end storyline">
-        {step === null ? 'Guided demo' : 'Exit demo'}
+        {t(step === null ? 'Guided demo' : 'Exit demo')}
       </button>
       {current && step !== null && (
         <div className="guide-bar" role="status">
@@ -43,11 +45,11 @@ export function GuidedDemoButton() {
           <div className="guide-text">
             <strong>{current.title}.</strong> {current.caption}
           </div>
-          <button className="btn btn-sm" disabled={step === 0} onClick={() => go(step - 1)}>Back</button>
+          <button className="btn btn-sm" disabled={step === 0} onClick={() => go(step - 1)}>{t('Back')}</button>
           {step < DEMO_STEPS.length - 1 ? (
-            <button className="btn btn-sm btn-primary" onClick={() => go(step + 1)}>Next</button>
+            <button className="btn btn-sm btn-primary" onClick={() => go(step + 1)}>{t('Next')}</button>
           ) : (
-            <button className="btn btn-sm btn-primary" onClick={() => setStep(null)}>Finish</button>
+            <button className="btn btn-sm btn-primary" onClick={() => setStep(null)}>{t('Finish')}</button>
           )}
         </div>
       )}

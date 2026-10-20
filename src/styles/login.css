@@ -1,44 +1,32 @@
-/* Login screen. Uses the shared tokens, so it follows the saved dark / light theme. */
-.login { display: flex; min-height: 100vh; background: var(--bg); color: var(--ink); }
+/* Sign-in: one plain centered card, always dark (same look as the other PoC sign-in pages). */
+.login { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; background: #1c1c1c; color: #fff; }
+.login-lang { position: absolute; top: 20px; inset-inline-end: 24px; }
 
-.login-brand { flex: 1 1 46%; max-width: 640px; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: 40px 48px; color: #f2f6fb; background: radial-gradient(900px 520px at 0% 0%, rgba(14, 165, 233, 0.35), transparent 60%), radial-gradient(800px 560px at 100% 100%, rgba(124, 58, 237, 0.4), transparent 60%), #0b1220; }
-.login-brand-top { display: flex; align-items: center; gap: 12px; }
-.login-brand .brand-text span { color: #9fb2c8; }
-.login-brand h2 { font-size: 34px; line-height: 1.15; margin: 0 0 24px; max-width: 420px; }
-.login-brand ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
-.login-brand li { display: flex; align-items: flex-start; gap: 10px; font-size: 14.5px; line-height: 1.4; color: #cfdbe8; }
-.login-brand li svg { flex-shrink: 0; margin-top: 2px; color: #7fa8f0; }
-.login-brand-foot { font-size: 12px; color: #8ca0b6; }
+.login-card { width: 100%; max-width: 440px; box-sizing: border-box; background: #0a0a0a; border-radius: 20px; padding: 44px 40px 36px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45); display: flex; flex-direction: column; }
+.login-card h1 { margin: 0; text-align: center; font-size: 22px; font-weight: 700; color: #fff; }
+.login-sub { margin: 8px 0 0; text-align: center; font-size: 15px; color: #8fa3bf; }
+.login-card label { margin: 32px 0 8px; font-size: 13.5px; letter-spacing: 0.03em; text-transform: uppercase; color: #7fb3e6; }
+.login-card .login-field + label { margin-top: 24px; }
 
-.login-panel { flex: 1 1 54%; display: flex; align-items: center; justify-content: center; padding: 32px 24px; }
-.login-card { width: 100%; max-width: 420px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); padding: 32px 32px 24px; display: flex; flex-direction: column; }
-.login-card-mark { display: none; }
-.login-card h1 { font-size: 26px; margin: 0; }
-.login-sub { margin: 2px 0 22px; color: var(--ink-3); font-size: 13.5px; }
-.login-card label { font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 0 0 6px; }
-.login-card input { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px; font-size: 14px; margin-bottom: 16px; }
-.login-card input:focus { border-color: var(--accent); outline: none; }
-.login-pw { position: relative; }
-.login-pw input { padding-right: 64px; }
-.login-pw-toggle { position: absolute; right: 6px; top: 6px; height: 32px; padding: 0 10px; background: transparent; border: 0; border-radius: 6px; color: var(--accent-strong); font-size: 12px; font-weight: 600; cursor: pointer; }
-.login-pw-toggle:hover { background: var(--accent-soft); }
-.login-error { min-height: 18px; margin: -6px 0 10px; font-size: 12.5px; color: var(--crit); }
-.login-submit { width: 100%; justify-content: center; padding: 12px 14px; font-size: 14.5px; font-weight: 700; }
+.login-field { position: relative; display: flex; align-items: center; }
+.login-field > svg { position: absolute; inset-inline-start: 16px; color: #9aa0aa; pointer-events: none; }
+.login-field input { width: 100%; height: 52px; box-sizing: border-box; padding: 0 48px; background: #141414; color: #fff; border: 1px solid #1f1f1f; border-radius: 12px; font-size: 16px; margin: 0; }
+.login-field input::placeholder { color: #9aa0aa; }
+.login-field input:focus { outline: none; border-color: #5a5a5a; }
+.login-eye { position: absolute; inset-inline-end: 12px; display: flex; padding: 4px; background: transparent; border: 0; color: #9aa0aa; cursor: pointer; }
+.login-eye:hover { color: #fff; }
 
-.login-demo { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); }
-.login-demo-head { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; font-size: 12px; color: var(--ink-3); }
-.login-demo-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.login-demo-item { display: flex; flex-direction: column; gap: 1px; text-align: left; padding: 8px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--ink); cursor: pointer; font: inherit; }
-.login-demo-item strong { font-size: 12.5px; font-weight: 600; }
-.login-demo-item span { font-size: 11px; color: var(--ink-3); }
-.login-demo-item:hover { border-color: var(--accent); }
-.login-demo-item.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.login-error { min-height: 18px; margin-top: 8px; font-size: 13px; color: #ff6b6b; }
+.login-submit { margin-top: 4px; height: 50px; border: 0; border-radius: 12px; background: #3f3f3f; color: #fff; font-size: 16px; font-weight: 500; cursor: pointer; transition: background 0.14s ease; }
+.login-submit:hover, .login-submit:focus-visible { background: #4a4a4a; }
 
-@media (max-width: 860px) {
-  .login-brand { display: none; }
-  .login-card-mark { display: block; margin-bottom: 14px; }
-}
-@media (max-width: 440px) {
-  .login-card { padding: 24px 18px 18px; }
-  .login-demo-list { grid-template-columns: 1fr; }
-}
+@media (max-width: 440px) { .login-card { padding: 32px 22px 28px; } }
+
+/* language switch (login + top bar) */
+.lang-toggle { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: #141414; border: 1px solid #2a2a2a; }
+.lang-toggle button { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: #8fa3bf; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.lang-toggle button.is-on { background: #262626; color: #fff; box-shadow: inset 0 0 0 1px #3a3a3a; }
+.lang-toggle button:hover:not(.is-on) { color: #fff; }
+:root[data-theme="light"] .topbar .lang-toggle { background: var(--surface-2); border-color: var(--border); }
+:root[data-theme="light"] .topbar .lang-toggle button { color: var(--ink-3); }
+:root[data-theme="light"] .topbar .lang-toggle button.is-on { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--border); }

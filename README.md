@@ -22,7 +22,11 @@ Everything works offline: fonts are bundled, there are no CDN calls.
 
 ### Sign-in (demo gate)
 
-The app opens on a login screen with the TA Event Manager account pre-filled (`ta-manager@turnpoint.demo` / `Turnpoint2026!`), so a demo is one press of **Sign in**. There is one account per role (same password, listed on the screen); picking one opens the app as that persona. Sign out is in the profile menu. This is a **demo gate, not security**: the accounts are in the client bundle. The `/ext/*` SAP / P6 stand-in consoles are not behind it.
+The app opens on a plain, generic login card with the credentials pre-filled (`admin` / `Turnpoint2026!`, the TA Event Manager), so a demo is one press of **Sign In**. To try another role, type its username with the same password: `steerco`, `planner`, `inspection`, `hse`, `contractor`. Sign out is in the profile menu. This is a **demo gate, not security**: the accounts are in the client bundle. The `/ext/*` SAP / P6 stand-in consoles are not behind it.
+
+### Language (English / العربية)
+
+The **EN / العربية** switch is on the login card and in the top bar; the choice is remembered and flips the page to right-to-left. Arabic covers the sign-in screen and the app shell: sidebar, stage bar, page tabs, top bar, profile menu, role names. **The page bodies (tables, charts, mock records, assistant answers, guided-demo captions) are still English**: translating them is a separate piece of work. Strings live in `src/i18n/ar.ts` (keyed by the English text; a missing key just shows English). The Arabic font (IBM Plex Sans Arabic) is bundled, so it works offline.
 
 ### Deploying to astrikos.xyz
 

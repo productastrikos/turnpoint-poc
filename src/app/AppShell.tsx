@@ -14,6 +14,7 @@ import { Card } from '../components/ui/Card';
 import { useToast } from './ToastContext';
 import { Icon } from './icons';
 import { startTurnpointLink } from '../integration/turnpointLink';
+import { useLang } from '../i18n/lang';
 
 // Shorter labels for the tab strip (the sidebar and search keep the full module names).
 const TAB_LABEL: Record<string, string> = {
@@ -104,18 +105,19 @@ function RestrictedPage({ moduleLabel, group }: { moduleLabel: string; group: ke
 
 function HubTabs({ moduleId }: { moduleId: string }) {
   const { levelFor } = useRole();
+  const { t } = useLang();
   const entry = navEntryForModule(moduleId);
   if (!entry || entry.members.length < 2) return null;
   return (
     <div className="hub-tabs" role="tablist" aria-label={entry.label}>
-      <span className="hub-title">{entry.label}</span>
+      <span className="hub-title">{t(entry.label)}</span>
       {entry.members.map((id) => {
         const m = MODULE_BY_ID[id];
         if (!m) return null;
         const locked = levelFor(m.group) === 'none';
         return (
           <NavLink key={id} to={m.path} end role="tab" className={({ isActive }) => `hub-tab ${isActive ? 'active' : ''} ${locked ? 'locked' : ''}`} title={locked ? 'Restricted for your role' : m.label}>
-            {TAB_LABEL[id] ?? m.label}
+            {t(TAB_LABEL[id] ?? m.label)}
           </NavLink>
         );
       })}

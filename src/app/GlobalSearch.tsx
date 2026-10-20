@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLang } from '../i18n/lang';
 import { search, type SearchHit } from '../services/searchService';
 
 export function GlobalSearch() {
+  const { t } = useLang();
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [open, setOpen] = useState(false);
@@ -65,7 +67,7 @@ export function GlobalSearch() {
       <input
         ref={ref}
         type="search"
-        placeholder="Search  ( / )"
+        placeholder={t('Search  ( / )')}
         aria-label="Global search"
         value={q}
         onFocus={() => setOpen(true)}

@@ -5,7 +5,7 @@ interface AuthCtx {
   /** Persona id of the signed-in user, or null on the login screen. */
   personaId: string | null;
   /** Returns true on success. */
-  signIn: (email: string, password: string) => boolean;
+  signIn: (username: string, password: string) => boolean;
   signOut: () => void;
 }
 
@@ -14,8 +14,8 @@ const Ctx = createContext<AuthCtx | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [personaId, setPersonaId] = useState<string | null>(readSession);
 
-  const signIn = useCallback((email: string, password: string) => {
-    const id = authenticate(email, password);
+  const signIn = useCallback((username: string, password: string) => {
+    const id = authenticate(username, password);
     if (!id) return false;
     writeSession(id);
     setPersonaId(id);

@@ -3,10 +3,12 @@ import { MODULE_BY_ID, NAV, PHASES, SECTIONS } from './moduleRegistry';
 import { usePhase } from './PhaseContext';
 import { useRole } from './RoleContext';
 import { Icon } from './icons';
+import { useLang } from '../i18n/lang';
 
 export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const { activePhase } = usePhase();
   const { levelFor } = useRole();
+  const { t } = useLang();
   const location = useLocation();
   const phaseLabel = PHASES.find((p) => p.id === activePhase)?.label ?? activePhase;
   const currentEntry = navIdForPath(location.pathname);
@@ -18,7 +20,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         {!collapsed && (
           <div className="brand-text">
             <strong>TURNPOINT</strong>
-            <span>Turnaround Digitalization</span>
+            <span>{t('Turnaround Digitalization')}</span>
           </div>
         )}
       </div>
@@ -28,7 +30,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           if (!entries.length) return null;
           return (
             <div className="sidebar-group" key={section.id}>
-              {!collapsed && <div className="nav-section-label">{section.title}</div>}
+              {!collapsed && <div className="nav-section-label">{t(section.title)}</div>}
               {entries.map((entry) => {
                 const first = MODULE_BY_ID[entry.members[0]];
                 const mods = entry.members.map((m) => MODULE_BY_ID[m]).filter(Boolean);
@@ -45,7 +47,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
                     title={collapsed ? entry.label : allLocked ? 'Restricted for your role' : relevant ? `Used in ${phaseLabel}` : undefined}
                   >
                     <Icon name={entry.icon} />
-                    {!collapsed && <span className="nav-label">{entry.label}</span>}
+                    {!collapsed && <span className="nav-label">{t(entry.label)}</span>}
                     {!collapsed && allLocked && <Icon name="lock" size={13} />}
                     {!collapsed && !allLocked && relevant && <span className="phase-dot" />}
                   </NavLink>
@@ -57,8 +59,8 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       </nav>
       {!collapsed && (
         <div className="sidebar-foot">
-          Stage focus: <strong>{phaseLabel}</strong>
-          <span>Dot marks entries used in this stage.</span>
+          {t('Stage focus:')} <strong>{t(phaseLabel)}</strong>
+          <span>{t('Dot marks entries used in this stage.')}</span>
         </div>
       )}
     </aside>

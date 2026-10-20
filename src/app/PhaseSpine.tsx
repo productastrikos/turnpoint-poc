@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { PHASES, PHASE_LANDING } from './moduleRegistry';
 import { usePhase } from './PhaseContext';
+import { useLang } from '../i18n/lang';
 
 export function PhaseSpine() {
   const { activePhase, setActivePhase } = usePhase();
   const navigate = useNavigate();
+  const { t } = useLang();
   const activeIdx = PHASES.findIndex((p) => p.id === activePhase);
 
   function selectPhase(id: (typeof PHASES)[number]['id']) {
@@ -23,7 +25,7 @@ export function PhaseSpine() {
           aria-current={activePhase === p.id ? 'step' : undefined}
         >
           <span className="num">{i < activeIdx ? '✓' : i + 1}</span>
-          {p.label}
+          {t(p.label)}
         </button>
       ))}
     </nav>

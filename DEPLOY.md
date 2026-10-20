@@ -23,8 +23,9 @@ answers on-device and the SAP tab stays in demo mode.
   `ANTHROPIC_API_KEY` unset on the server if that is not acceptable; the demo then runs on the on-device assistant.
 
 ## Login
-Demo sign-in screen, credentials pre-filled (`ta-manager@turnpoint.demo` / `Turnpoint2026!`; one account per role, same
-password, listed on the screen). It is a demo gate in the client bundle, **not security**. Do not put real data behind it.
+Demo sign-in screen, credentials pre-filled (`admin` / `Turnpoint2026!`; other roles: `steerco`, `planner`, `inspection`,
+`hse`, `contractor`, same password). It is a demo gate in the client bundle, **not security**. Do not put real data behind it.
+The UI has an English / Arabic switch (shell only, see README > Language); the Arabic font is bundled, no CDN.
 
 ## Commands
 ```bash

@@ -1,0 +1,28 @@
+/* Right-to-left (Arabic). Flex rows mirror by themselves once <html dir="rtl">; these rules fix the physical
+   left/right bits of the shell and swap in the bundled Arabic font. Page bodies are English and stay readable. */
+:root[dir="rtl"] {
+  --font-display: 'IBM Plex Sans Arabic', 'Inter', 'Segoe UI', Tahoma, sans-serif;
+  --font-body: 'IBM Plex Sans Arabic', 'Inter', 'Segoe UI', Tahoma, sans-serif;
+}
+
+/* sidebar sits on the right: its divider moves to the left edge */
+[dir="rtl"] .sidebar { border-right: 0; border-left: 1px solid var(--border); }
+[dir="rtl"] .nav-section-label { letter-spacing: 0; }
+[dir="rtl"] .brand-text strong, [dir="rtl"] .tb-label, [dir="rtl"] .eyebrow { letter-spacing: 0; }
+[dir="rtl"] .brand-text span { text-transform: none; letter-spacing: 0; }
+
+/* search field, bell badge, profile menu */
+[dir="rtl"] .topbar-search input { text-align: right; }
+[dir="rtl"] .bell-count { right: auto; left: -5px; }
+[dir="rtl"] .profile-menu { right: auto; left: 0; text-align: right; }
+[dir="rtl"] .profile-menu-item { text-align: right; }
+
+/* stage bar and page tabs read right to left; chevrons and arrows flip */
+[dir="rtl"] .phase-spine, [dir="rtl"] .hub-tabs { direction: rtl; }
+[dir="rtl"] .hub-title { margin-inline-end: 8px; }
+
+/* the assistant panel docks on the left in RTL */
+[dir="rtl"] .chat-panel { right: auto; left: 0; border-left: 0; border-right: 1px solid var(--border); }
+
+/* keep Latin / numeric content (IDs, codes, figures) left-to-right inside RTL pages */
+[dir="rtl"] .mono, [dir="rtl"] input[type="number"], [dir="rtl"] input[type="password"] { direction: ltr; }
