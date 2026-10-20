@@ -45,7 +45,9 @@ function Pane({ src, title, hidden }: { src: string; title: string; hidden?: boo
 /** TURNPOINT and one stand-in system side by side in one window, for presenting and recording the two-way sync. */
 export default function SplitView() {
   const [params, setParams] = useSearchParams();
-  const left = params.get('left') ?? '/';
+  // Only the pages offered in the selector are framed: ?left= is user-controlled and would otherwise reach iframe src (javascript: / external URLs).
+  const leftParam = params.get('left');
+  const left = LEFT_PAGES.find((p) => p.path === leftParam)?.path ?? '/';
   const [leftKey, setLeftKey] = useState(0);
   const [last, setLast] = useState('');
   const right = (params.get('right') === 'p6' ? 'p6' : 'sap') as keyof typeof RIGHT;
