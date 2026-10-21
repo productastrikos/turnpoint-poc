@@ -12,6 +12,9 @@ import { AREA_IDS, DISCIPLINES, PEOPLE } from '../../mocks/master';
 import { useToast } from '../../app/ToastContext';
 import { SapPullDrawer } from '../integrations/SapTab';
 import { DupCheckChip } from './DuplicatePanel';
+import { DurationExamples, DurationGuard } from './DurationGuard';
+import type { DurationAssessment } from '../../ai/durationModel';
+import type { DurationExample } from '../../services/durationService';
 import { checkCandidate, checkRows, type PairScore } from '../../services/duplicateService';
 import { SimBadge } from '../../components/ui/SimBadge';
 import type { Discipline, Job } from '../../types';
@@ -25,6 +28,7 @@ const FIELDS: FieldDef[] = [
   { name: 'tag', label: 'Equipment tag', required: true, placeholder: 'e.g. E-204' },
   { name: 'costOMR', label: 'Budgetary estimate (OMR)', type: 'number', required: true, min: 1 },
   { name: 'manhours', label: 'Man-hours', type: 'number', required: true, min: 1 },
+  { name: 'plannedHours', label: 'Planned duration (hours)', type: 'number', required: true, min: 0.5, hint: 'Elapsed time you expect the work to take. The AI checks it below.' },
   { name: 'likelihood', label: 'Risk likelihood (1-5)', type: 'select', options: LEVELS, required: true },
   { name: 'consequence', label: 'Risk consequence (1-5)', type: 'select', options: LEVELS, required: true },
   { name: 'requestedBy', label: 'Originator', required: true, defaultValue: PEOPLE.planner },
@@ -55,6 +59,7 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
   const [loaded, setLoaded] = useState<'bulk' | 'excel' | null>(null);
   const [sapOpen, setSapOpen] = useState(false);
   const [matches, setMatches] = useState<PairScore[]>([]);
+  const [duration, setDuration] = useState<DurationAssessment | null>(null);
   const [rowChecks, setRowChecks] = useState<Record<string, PairScore | undefined>>({});
 
   // as-you-type duplicate check (S9): debounced, against the live worklist
@@ -77,6 +82,8 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
       return;
     }
     setBusy(true);
+    const planned = Number(values.plannedHours);
+    const underEstimated = duration !== null && duration.verdict !== 'ok';
     const job = await createJob({
       desc: values.desc,
       discipline: values.discipline as Discipline,
@@ -88,6 +95,10 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
       likelihood: Number(values.likelihood) as Job['likelihood'],
       consequence: Number(values.consequence) as Job['consequence'],
       source: 'Manual',
+      plannedHours: planned,
+      aiDuration: duration
+        ? { expectedHours: duration.expectedHours, p80Hours: duration.p80Hours, verdict: duration.verdict, withinPct: duration.withinPct, accepted: planned >= duration.expectedHours }
+        : undefined,
     });
     setBusy(false);
     setValues(initialValues(FIELDS));
@@ -95,6 +106,10 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
     onCreated();
     onClose();
     const dup = matches.find((m) => m.kind === 'duplicate');
+    if (underEstimated && duration && planned < duration.expectedHours) {
+      showToast(`${job.id} created with ${planned} h, but the AI expects about ${duration.expectedHours} h. The gap is flagged in the worklist.`, 'warn');
+      return;
+    }
     showToast(dup ? `${job.id} created at Gate 1 and flagged as a possible duplicate of ${dup.b.id}: it is listed for review in the worklist.` : `${job.id} created at Gate 1. Completeness 100%.`, dup ? 'warn' : 'good');
   }
 
@@ -125,6 +140,11 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
     showToast(`${ok.length} rows imported as scope items at Gate 1.${invalid ? ` ${invalid} rejected for missing mandatory fields.` : ''}${dupNote}`, invalid || dupRows.length ? 'warn' : 'good');
   }
 
+  function applyExample(ex: DurationExample) {
+    setValues((p) => ({ ...p, desc: ex.desc, discipline: ex.discipline, area: ex.area, tag: ex.tag, plannedHours: String(ex.plannedHours), manhours: String(ex.manhours), costOMR: String(ex.costOMR), likelihood: p.likelihood || '3', consequence: p.consequence || '3' }));
+    setErrors({});
+  }
+
   const sample = loaded === 'bulk' ? BULK_SAMPLE : loaded === 'excel' ? EXCEL_SAMPLE : [];
 
   useEffect(() => {
@@ -147,7 +167,17 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
               <ProgressBar value={filled} max={required.length} label="complete" />
               <span className="mono small">{filled}/{required.length}</span>
             </div>
+            <DurationExamples onPick={applyExample} />
             <FormFields fields={FIELDS} values={values} errors={errors} onChange={(n, v) => setValues((p) => ({ ...p, [n]: v }))} />
+            <DurationGuard
+              desc={values.desc ?? ''}
+              tag={values.tag ?? ''}
+              area={values.area ?? ''}
+              discipline={values.discipline ?? ''}
+              plannedHours={values.plannedHours ?? ''}
+              onUseHours={(h) => setValues((p) => ({ ...p, plannedHours: String(h) }))}
+              onResult={setDuration}
+            />
             {top && (
               <div className={`callout ${dupWarning ? 'callout-crit' : ''}`} style={{ marginTop: 14 }} role="status">
                 <div className="row-wrap" style={{ justifyContent: 'space-between' }}>

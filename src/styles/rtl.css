@@ -1,5 +1,6 @@
 /* Right-to-left (Arabic). Flex rows mirror by themselves once <html dir="rtl">; these rules fix the physical
-   left/right bits of the shell and swap in the bundled Arabic font. Page bodies are English and stay readable. */
+   left/right bits of the shell and the page bodies and swap in the bundled Arabic font. The page text itself is
+   translated at runtime (src/i18n/domTranslate.ts). */
 :root[dir="rtl"] {
   --font-display: 'IBM Plex Sans Arabic', 'Inter', 'Segoe UI', Tahoma, sans-serif;
   --font-body: 'IBM Plex Sans Arabic', 'Inter', 'Segoe UI', Tahoma, sans-serif;
@@ -26,3 +27,17 @@
 
 /* keep Latin / numeric content (IDs, codes, figures) left-to-right inside RTL pages */
 [dir="rtl"] .mono, [dir="rtl"] input[type="number"], [dir="rtl"] input[type="password"] { direction: ltr; }
+
+/* page bodies */
+/* table headers and chip counts follow the reading direction */
+[dir="rtl"] .table th { text-align: start; }
+[dir="rtl"] .fchip-count, [dir="rtl"] .tab-badge { margin-left: 0; margin-inline-start: 6px; }
+[dir="rtl"] .sim-badge { margin-left: 0; margin-inline-start: 10px; }
+[dir="rtl"] .progress-label { text-align: left; }
+/* card accent bars sit on the reading-start edge */
+[dir="rtl"] .live-feed { border-left: 1px solid var(--border); border-right: 4px solid var(--accent); }
+[dir="rtl"] .toast { border-left-width: 1px; border-right: 4px solid var(--border); }
+/* charts and diagrams are drawn in left-to-right coordinates: keep the drawing LTR (axis labels, anchors, trees),
+   and let any Arabic text inside still run right to left */
+[dir="rtl"] svg, [dir="rtl"] .org-tree, [dir="rtl"] .timeline, [dir="rtl"] .gantt { direction: ltr; }
+[dir="rtl"] svg text { unicode-bidi: plaintext; }

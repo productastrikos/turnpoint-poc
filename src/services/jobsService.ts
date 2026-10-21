@@ -43,6 +43,8 @@ export interface NewJobInput {
   sapRef?: string;
   startDay?: number;
   durationDays?: number;
+  plannedHours?: number;
+  aiDuration?: Job['aiDuration'];
 }
 
 function buildJob(input: NewJobInput): Job {
@@ -66,9 +68,11 @@ function buildJob(input: NewJobInput): Job {
     taClass: 'TA',
     sapRef: input.sapRef,
     startDay: input.startDay ?? 20,
-    durationDays: input.durationDays ?? Math.max(1, Math.round(input.manhours / 160)),
+    durationDays: input.durationDays ?? (input.plannedHours ? Math.max(1, Math.ceil(input.plannedHours / 24)) : Math.max(1, Math.round(input.manhours / 160))),
     inBaseline: false,
     contractor: DISCIPLINE_CONTRACTOR[input.discipline],
+    plannedHours: input.plannedHours,
+    aiDuration: input.aiDuration,
   };
   store = [job, ...store];
   return job;

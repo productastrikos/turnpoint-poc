@@ -2,13 +2,18 @@ import { materialItems, WEEKS_PER_MONTH, classifyLead } from '../mocks/materials
 import type { MaterialItem } from '../types';
 import { createCollection } from './_collection';
 import { pushSapStatus } from './integrationService';
+import { ACTIVE_TA_ID } from '../mocks/master';
 
 const store = createCollection<MaterialItem>(materialItems);
 
-export const getMaterials = () => store.list();
+/** MTO lines of one turnaround (the demo event by default, so BOM, procurement, work packs and search stay scoped to it). */
+export const getMaterials = (taId: string = ACTIVE_TA_ID) => store.list().then((xs) => xs.filter((m) => m.taId === taId));
+/** MTO lines of every turnaround, for the Materials page TA filter. */
+export const getAllMaterials = () => store.list();
 
 const NEXT: Record<MaterialItem['prStatus'], MaterialItem['prStatus'] | null> = { 'not-raised': 'raised', raised: 'po-issued', 'po-issued': 'delivered', delivered: null };
-export const prActionLabel = (s: MaterialItem['prStatus']) => ({ 'not-raised': 'Raise PR', raised: 'Issue PO', 'po-issued': 'Mark delivered', delivered: null })[s];
+/** Row action on the Materials page. Delivery is not marked by hand here, so a PO-issued line has no action. */
+export const prActionLabel = (s: MaterialItem['prStatus']) => ({ 'not-raised': 'Raise PR', raised: 'Issue PO', 'po-issued': null, delivered: null })[s];
 
 /** Move a material line one step along PR -> PO -> delivered. Raising a PR creates a requisition in SAP MM (simulated). */
 export async function advancePr(id: string): Promise<MaterialItem> {
@@ -31,6 +36,7 @@ export async function addMaterials(lines: { description: string; leadWeeks: numb
   for (const l of lines) {
     const item: MaterialItem = {
       id: `MTO-${String(extraSeq++).padStart(3, '0')}`,
+      taId: ACTIVE_TA_ID,
       description: l.description,
       leadWeeks: l.leadWeeks,
       leadTime: classifyLead(l.leadWeeks),

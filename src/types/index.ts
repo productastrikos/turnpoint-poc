@@ -35,6 +35,10 @@ export interface Job {
   durationDays: number;
   inBaseline: boolean; // part of the scope frozen at the freeze date
   contractor: string;
+  /** Duration the originator planned for the work, in hours (entered on the new-scope form). */
+  plannedHours?: number;
+  /** Snapshot of the AI duration check taken when the item was created. */
+  aiDuration?: { expectedHours: number; p80Hours: number; verdict: 'ok' | 'warn' | 'crit'; withinPct: number; accepted: boolean };
 }
 
 export interface GateApproval {
@@ -221,6 +225,7 @@ export type LeadTime = 'long' | 'medium' | 'short';
 
 export interface MaterialItem {
   id: string;
+  taId: string; // the turnaround this MTO line belongs to (TaEvent.id)
   description: string;
   leadTime: LeadTime;
   leadWeeks: number; // delivery time after PO award, in weeks (>26 long, 17-26 medium, <17 short ~ 6 / 4-6 / <4 months)

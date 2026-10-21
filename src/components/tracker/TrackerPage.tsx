@@ -44,6 +44,8 @@ export interface TrackerConfig<T extends { id: string }> {
   };
   detail?: { title: (row: T) => ReactNode; subtitle?: (row: T) => ReactNode; render: (row: T) => ReactNode };
   top?: (rows: T[]) => ReactNode;
+  /** Rendered between the page header and the KPI tiles (e.g. a scope switch that drives `load`). */
+  preface?: ReactNode;
   pageSize?: number;
   initialSort?: { key: string; dir: 'asc' | 'desc' };
   kpiColumns?: 3 | 4 | 5 | 6;
@@ -166,6 +168,8 @@ export function TrackerPage<T extends { id: string }>({ config }: { config: Trac
           }
         />
       )}
+
+      {config.preface && <div style={{ marginBottom: 16 }}>{config.preface}</div>}
 
       <div className={`grid grid-${cols}`} style={{ marginBottom: 16, gap: 12 }}>
         {kpis.map((k) => (
