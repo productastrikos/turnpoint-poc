@@ -26,6 +26,7 @@ const AiPanel = L(() => import('../modules/ai-panel/AiPanelPage'));
 const Integrations = L(() => import('../modules/integrations/IntegrationHubPage'));
 const Coverage = L(() => import('../modules/coverage/CoveragePage'));
 const Portfolio = L(() => import('../modules/portfolio/PortfolioPage'));
+const PlanCheck = L(() => import('../modules/plan-check/PlanCheckPage'));
 const ExecSummary = L(() => import('../modules/executive-summary/ExecutiveSummaryPage'));
 const Platform = L(() => import('../modules/platform/PlatformPage'));
 const Readiness = L(() => import('../modules/readiness/ReadinessPage'));
@@ -82,6 +83,7 @@ export const PAGES: Record<ModuleId, ReactElement> = {
   integrations: <Integrations />,
   coverage: <Coverage />,
   portfolio: <Portfolio />,
+  'plan-check': <PlanCheck />,
   'executive-summary': <ExecSummary />,
   platform: <Platform />,
   readiness: <Readiness />,

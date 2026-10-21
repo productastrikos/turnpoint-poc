@@ -43,6 +43,7 @@ export const MODULES = [
   { id: 'dashboard', path: '/', label: 'Command Dashboard', section: 'general', phases: ALL, group: 'field', keywords: 'home overview s-curve kpi' },
   { id: 'executive-summary', path: '/executive-summary', label: 'Executive Summary', section: 'general', phases: ['execution', 'closeout'], group: 'strategic', keywords: 'steering rag report' },
   { id: 'portfolio', path: '/portfolio', label: 'Multi-TA Portfolio', section: 'general', phases: ['initiation'], group: 'strategic', keywords: '10 year plan business plan budget duration' },
+  { id: 'plan-check', path: '/plan-check', label: 'Plan vs History Check', section: 'general', phases: ALL, group: 'strategic', keywords: 'compare previous turnaround validate plan benchmark contingency freeze lead time duration mistakes' },
   { id: 'kpis', path: '/kpis', label: 'KPIs & S-Curve', section: 'general', phases: ['execution', 'closeout'], group: 'field', keywords: 'performance scorecard spi cpi trif s-curve' },
   { id: 'readiness', path: '/readiness', label: 'Overall STO Readiness', section: 'general', phases: ['planning', 'preTa', 'execution'], group: 'field', keywords: 'readiness score gaps' },
   { id: 'budget', path: '/budget', label: 'Budget Control', section: 'general', phases: ['planning', 'preTa', 'execution', 'closeout'], group: 'commercial', keywords: 'cost wbs forecast variance' },
@@ -139,6 +140,7 @@ export interface NavEntry {
 export const NAV: readonly NavEntry[] = [
   { id: 'n-dashboard', label: 'Command Dashboard', section: 'general', icon: 'grid', members: ['dashboard'] },
   { id: 'n-reporting', label: 'Reporting & KPIs', section: 'general', icon: 'chart', members: ['executive-summary', 'kpis', 'readiness', 'portfolio', 'daily-report'] },
+  { id: 'n-plancheck', label: 'Plan vs History Check', section: 'general', icon: 'check', members: ['plan-check'] },
   { id: 'n-budget', label: 'Budget Control', section: 'general', icon: 'coin', members: ['budget'] },
   { id: 'n-ai', label: 'AI Analytics', section: 'general', icon: 'spark', members: ['ai-panel'] },
   { id: 'n-mobile', label: 'Mobile Field App', section: 'general', icon: 'phone', members: ['mobile-capture'] },

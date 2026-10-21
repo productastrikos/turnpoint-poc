@@ -7,10 +7,10 @@ import { Chip } from '../../components/ui/Chip';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { DataTable } from '../../components/ui/DataTable';
 import { ActionButton } from '../../components/ui/ActionButton';
-import { FormDialog, type FieldDef } from '../../components/ui/FormDialog';
+import { CreatePlanDialog } from '../plan-check/CreatePlanDialog';
 import { Gantt, type GanttRow } from '../../components/charts/Gantt';
 import { BarChart } from '../../components/charts/BarChart';
-import { addTaEvent, totals } from '../../services/portfolioService';
+import { totals } from '../../services/portfolioService';
 import { getReadiness } from '../../services/readinessService';
 import { useActiveTa } from '../../app/TaContext';
 import { useToast } from '../../app/ToastContext';
@@ -23,15 +23,6 @@ const TYPE_COLOR: Record<TaType, string> = {
   'Inspection Shutdown': 'var(--s3)',
   'Catalyst Change': 'var(--s4)',
 };
-
-const FIELDS: FieldDef[] = [
-  { name: 'name', label: 'Event name', required: true, placeholder: 'e.g. Minor TA 2036: FCC' },
-  { name: 'type', label: 'Type', type: 'select', options: ['Major STO', 'Minor TA', 'Inspection Shutdown', 'Catalyst Change'], required: true },
-  { name: 'startDate', label: 'Planned start', type: 'date', required: true },
-  { name: 'durationDays', label: 'Duration (days)', type: 'number', required: true, min: 3, max: 60 },
-  { name: 'budgetOMR', label: 'Budget (OMR)', type: 'number', required: true, min: 100000 },
-  { name: 'units', label: 'Units (comma separated)', required: true, placeholder: 'HCU, CDU' },
-];
 
 export default function PortfolioPage() {
   const { tas, activeTaId, setActiveTaId, refreshTas } = useActiveTa();
@@ -68,23 +59,6 @@ export default function PortfolioPage() {
     return ys;
   }, [tas]);
 
-  async function create(v: Record<string, string>) {
-    const year = Number(v.startDate.slice(0, 4));
-    const ev = await addTaEvent({
-      name: v.name,
-      year,
-      type: v.type as TaType,
-      units: v.units.split(',').map((u) => u.trim()).filter(Boolean),
-      startDate: v.startDate,
-      durationDays: Number(v.durationDays),
-      budgetOMR: Number(v.budgetOMR),
-    });
-    refreshTas();
-    setSelected(ev.id);
-    setOpen(false);
-    showToast(`${ev.id} added to the 10-year business plan`, 'good');
-  }
-
   function activate(x: TaEvent) {
     setActiveTaId(x.id);
     showToast(`Active TA set to ${x.id}. Dashboard and Executive Summary now show this event.`, 'accent');
@@ -98,7 +72,7 @@ export default function PortfolioPage() {
         subtitle="OQ RPI 10-year turnaround business plan with budget and estimated duration per event. Selecting an event sets the Active TA in the top bar and rescales the dashboard."
         badges={['illustrative']}
         checklist="G1"
-        action={<ActionButton variant="primary" small={false} onClick={() => setOpen(true)}>Plan a TA event</ActionButton>}
+        action={<ActionButton variant="primary" small={false} onClick={() => setOpen(true)}>Create plan</ActionButton>}
       />
 
       <div className="grid grid-4" style={{ marginBottom: 16 }}>
@@ -162,6 +136,7 @@ export default function PortfolioPage() {
                 <button className="btn btn-primary" onClick={() => activate(sel)}>
                   {sel.id === activeTaId ? 'Open dashboard' : 'Set as Active TA'}
                 </button>
+                {sel.status !== 'completed' && <button className="btn" onClick={() => navigate(`/plan-check?ta=${sel.id}`)}>Check plan vs history</button>}
               </div>
             </Card>
           )}
@@ -177,7 +152,7 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      <FormDialog open={open} onClose={() => setOpen(false)} title="Plan a TA event" fields={FIELDS} submitLabel="Add to business plan" onSubmit={create} />
+      <CreatePlanDialog open={open} onClose={() => setOpen(false)} onCreated={(ev) => { refreshTas(); setSelected(ev.id); }} />
     </div>
   );
 }
