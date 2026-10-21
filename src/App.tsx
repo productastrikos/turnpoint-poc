@@ -4,7 +4,6 @@ import { AppShell } from './app/AppShell';
 import { PhaseProvider } from './app/PhaseContext';
 import { RoleProvider } from './app/RoleContext';
 import { useAuth } from './app/AuthContext';
-import { LoginPage } from './app/LoginPage';
 import { TaProvider } from './app/TaContext';
 import { ToastProvider } from './app/ToastContext';
 import { AppRoutes } from './app/routes';
@@ -27,10 +26,9 @@ function App() {
   const { pathname } = useLocation();
   const { personaId } = useAuth();
   if (pathname.startsWith('/ext/')) return <ExtPage path={pathname} />;
-  // The login screen is shown at whatever URL was opened, so a deep link lands on its page after sign-in.
-  if (!personaId) return <LoginPage />;
+  // Sign-in is switched off: the app opens straight away as the TA Event Manager. The login screen (app/LoginPage) is kept for when it is needed again.
   return (
-    <RoleProvider initialPersonaId={personaId}>
+    <RoleProvider initialPersonaId={personaId ?? 'ta-manager'}>
       <ToastProvider>
         <TaProvider>
           <PhaseProvider>
