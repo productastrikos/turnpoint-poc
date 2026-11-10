@@ -16,12 +16,25 @@ import { BAND_TONE, completeness, rankJobs, riskBand, riskScore } from '../../se
 import { sapNotificationForJob, sapWoForJob, p6IdForJob } from '../../mocks/sapKeys';
 import { areaLabel } from '../../mocks/master';
 import { useRole } from '../../app/RoleContext';
+import { useToast } from '../../app/ToastContext';
+import { FormDialog, type FieldDef } from '../../components/ui/FormDialog';
+import { applyBudgetEstimate, formatHours, formatMoney, requestChange, requestRemoval } from '../../services/scopeService';
+import { estimateNow } from '../../services/estimateService';
+import { BudgetEstimateModal, omr } from './BudgetEstimator';
+import { PhaseChip } from './PhaseChip';
+import { phaseOf, useScope } from './useScope';
 import type { Job } from '../../types';
 
 const STATUS_LABEL = (j: Job) => (j.status === 'rejected' && j.taClass === 'Non-TA' ? 'diverted' : j.status === 'approved' ? 'approved' : j.status === 'rejected' ? 'rejected' : `at gate ${j.gate}`);
 
 export function WorklistTab({ jobs, reload }: { jobs: Job[]; reload: () => void }) {
   const { role } = useRole();
+  const { showToast } = useToast();
+  const scope = useScope();
+  const staff = role !== 'contractor';
+  const [estJob, setEstJob] = useState<Job | null>(null);
+  const [changeJob, setChangeJob] = useState<Job | null>(null);
+  const [removeJob, setRemoveJob] = useState<Job | null>(null);
   const [q, setQ] = useState('');
   const [disc, setDisc] = useState('all');
   const [status, setStatus] = useState('all');
@@ -38,20 +51,41 @@ export function WorklistTab({ jobs, reload }: { jobs: Job[]; reload: () => void 
     return true;
   });
   const live = jobs.filter((j) => j.status !== 'rejected');
+  const noCost = live.filter((j) => j.costOMR === 0);
+
+  async function acceptEstimate(j: Job, e: { estimateOMR: number; lowOMR: number; highOMR: number; confidence: number }) {
+    await applyBudgetEstimate(j.id, e.estimateOMR);
+    reload();
+    showToast(`${j.id} budget set to ${omr(e.estimateOMR)} by the AI estimate (range ${omr(e.lowOMR)} to ${omr(e.highOMR)}, ${e.confidence}% confidence). Mandatory field now complete.`, 'good');
+  }
+  async function estimateAll() {
+    for (const j of noCost) {
+      const e = estimateNow({ desc: j.desc, discipline: j.discipline, tag: j.tag, area: j.area, manhours: j.manhours, likelihood: j.likelihood, consequence: j.consequence });
+      await applyBudgetEstimate(j.id, e.estimateOMR);
+    }
+    reload();
+    showToast(`AI budget estimate applied to ${noCost.length} item${noCost.length === 1 ? '' : 's'} without a cost. Review the ranges in the item drawer.`, 'good');
+  }
+  const changeFields = (j: Job): FieldDef[] => [
+    { name: 'costOMR', label: 'New budgetary estimate (OMR)', type: 'number', required: true, min: 1, defaultValue: String(j.costOMR) },
+    { name: 'manhours', label: 'New man-hours', type: 'number', required: true, min: 1, defaultValue: String(j.manhours) },
+    { name: 'reason', label: 'Why (reason for the change)', type: 'textarea', required: true },
+  ];
   const totalCost = live.reduce((s, j) => s + j.costOMR, 0);
-  const complete = Math.round(jobs.reduce((s, j) => s + completeness(j), 0) / Math.max(1, jobs.length));
+  const complete = Math.floor(jobs.reduce((s, j) => s + completeness(j), 0) / Math.max(1, jobs.length));
 
   const columns: Column<Job>[] = [
     { key: 'id', header: 'Scope item', render: (j) => <div><strong className="mono">{j.id}</strong><div><IdChips p6Id={j.status === 'approved' || j.inBaseline ? p6IdForJob(j) : undefined} sapWo={sapWoForJob(j)} sapNotif={sapNotificationForJob(j)} /></div></div> },
     { key: 'desc', header: 'Description', render: (j) => <div style={{ maxWidth: 300 }}>{j.desc}<div className="small muted">{j.tag} · {areaLabel(j.area)}</div></div> },
     { key: 'discipline', header: 'Discipline', render: (j) => <span className="small">{j.discipline}</span> },
     { key: 'source', header: 'Source', render: (j) => <Chip tone={j.source.startsWith('SAP') ? 'accent' : 'neutral'}>{j.source}</Chip>, sortValue: (j) => j.source },
-    { key: 'costOMR', header: 'Estimate', align: 'right', render: (j) => <CostValue amount={j.costOMR} />, sortValue: (j) => j.costOMR },
+    { key: 'costOMR', header: 'Estimate', align: 'right', render: (j) => (j.costOMR === 0 && staff ? <span className="row-wrap" style={{ justifyContent: 'flex-end', gap: 6 }}><Chip tone="crit">No estimate</Chip><button className="btn btn-sm" onClick={(e) => { e.stopPropagation(); setEstJob(j); }} data-testid="row-ai-estimate">AI estimate</button></span> : <CostValue amount={j.costOMR} />), sortValue: (j) => j.costOMR },
     { key: 'manhours', header: 'Man-hours', mono: true, align: 'right', render: (j) => j.manhours.toLocaleString() },
     { key: 'aiDuration', header: 'AI duration', render: (j) => (j.aiDuration && j.plannedHours ? <span title={`Planned ${j.plannedHours} h. AI expected ${j.aiDuration.expectedHours} h (P80 ${j.aiDuration.p80Hours} h), ${j.aiDuration.withinPct}% chance of finishing within the plan when the item was created.`}><Chip tone={j.aiDuration.verdict === 'ok' ? 'good' : j.aiDuration.verdict === 'warn' ? 'warn' : 'crit'}>{j.plannedHours} h → AI {j.aiDuration.expectedHours} h</Chip></span> : <span className="small muted">—</span>), sortValue: (j) => (j.aiDuration && j.plannedHours ? j.aiDuration.expectedHours / j.plannedHours : 0) },
     { key: 'risk', header: 'Risk', render: (j) => <Chip tone={BAND_TONE[riskBand(riskScore(j))]}>{riskScore(j)} {riskBand(riskScore(j))}</Chip>, sortValue: (j) => riskScore(j) },
     { key: 'priority', header: 'Priority', render: (j) => <span><Chip tone={ranks[j.id].band === 'P1' ? 'crit' : ranks[j.id].band === 'P2' ? 'warn' : 'neutral'}>{ranks[j.id].band}</Chip> <span className="mono small muted">#{ranks[j.id].rank}</span></span>, sortValue: (j) => ranks[j.id].rank },
-    { key: 'status', header: 'Status', render: (j) => <StatusChip status={STATUS_LABEL(j)} tone={j.status === 'approved' ? 'good' : j.status === 'rejected' ? (j.taClass === 'Non-TA' ? 'neutral' : 'crit') : 'warn'} />, sortValue: (j) => STATUS_LABEL(j) },
+    { key: 'phase', header: 'Phase', nosort: true, render: (j) => <PhaseChip phase={phaseOf(j, scope)} /> },
+    { key: 'status', header: 'Status', render: (j) => scope.openVarByJob[j.id] ? <Chip tone="warn">{scope.openVarByJob[j.id].type} variation pending</Chip> : <StatusChip status={STATUS_LABEL(j)} tone={j.status === 'approved' ? 'good' : j.status === 'rejected' ? (j.taClass === 'Non-TA' ? 'neutral' : 'crit') : 'warn'} />, sortValue: (j) => STATUS_LABEL(j) },
   ];
 
   return (
@@ -71,12 +105,62 @@ export function WorklistTab({ jobs, reload }: { jobs: Job[]; reload: () => void 
           <input type="text" placeholder="Search scope items, tags, SAP numbers" value={q} onChange={(e) => setQ(e.target.value)} />
           <FilterChips options={['Inspection', 'Rotating Equipment', 'Process', 'Instrumentation', 'Civil', 'Electrical'].map((d) => ({ value: d }))} value={disc} onChange={setDisc} allLabel="All disciplines" />
           <FilterChips options={[{ value: 'approved' }, { value: 'pending' }, { value: 'rejected' }]} value={status} onChange={setStatus} allLabel="Any status" />
-          <span style={{ marginLeft: 'auto' }}><ActionButton variant="primary" small={false} onClick={() => setOpen(true)}>New scope item</ActionButton></span>
+          <span style={{ marginLeft: 'auto' }} className="row-wrap">
+            {staff && noCost.length > 0 && <ActionButton small={false} onClick={estimateAll} data-testid="estimate-all">AI budget estimate for {noCost.length} item{noCost.length === 1 ? '' : 's'} without a cost</ActionButton>}
+            <ActionButton variant="primary" small={false} onClick={() => setOpen(true)}>{scope.stage === 'frozen' ? 'New scope item (variation)' : 'New scope item'}</ActionButton>
+          </span>
         </div>
         <DataTable columns={columns} rows={visible} rowKey={(j) => j.id} onRowClick={setSel} activeKey={sel?.id} pageSize={12} dense initialSort={{ key: 'priority', dir: 'asc' }} />
       </Card>
 
       <CreateScopeDialog open={open} onClose={() => setOpen(false)} onCreated={() => reload()} />
+
+      <BudgetEstimateModal
+        open={Boolean(estJob)}
+        title={estJob ? `AI budget estimate: ${estJob.id}` : 'AI budget estimate'}
+        input={estJob ? { desc: estJob.desc, discipline: estJob.discipline, tag: estJob.tag, area: estJob.area, manhours: estJob.manhours, likelihood: estJob.likelihood, consequence: estJob.consequence } : null}
+        onClose={() => setEstJob(null)}
+        onAccept={async (e) => {
+          const j = estJob!;
+          setEstJob(null);
+          await acceptEstimate(j, e);
+          setSel((s) => (s && s.id === j.id ? { ...s, costOMR: e.estimateOMR } : s));
+        }}
+      />
+      {changeJob && (
+        <FormDialog
+          key={changeJob.id}
+          open
+          onClose={() => setChangeJob(null)}
+          title={`Request change: ${changeJob.id}`}
+          fields={changeFields(changeJob)}
+          submitLabel="Raise change variation"
+          onSubmit={async (v) => {
+            const r = await requestChange(changeJob.id, { costOMR: Number(v.costOMR), manhours: Number(v.manhours) }, v.reason);
+            setChangeJob(null);
+            setSel(null);
+            reload();
+            showToast(`${r.id} raised: change on ${r.jobId} (${formatMoney(r.costOMR)}, ${formatHours(r.manhours)}${r.cpDays ? `, critical path +${r.cpDays} d` : ''}). Awaiting ${r.approver}.`, 'warn');
+          }}
+        />
+      )}
+      {removeJob && (
+        <FormDialog
+          key={`rm-${removeJob.id}`}
+          open
+          onClose={() => setRemoveJob(null)}
+          title={`Request removal: ${removeJob.id}`}
+          fields={[{ name: 'reason', label: 'Why (reason for removing it)', type: 'textarea', required: true }]}
+          submitLabel="Raise deletion variation"
+          onSubmit={async (v) => {
+            const r = await requestRemoval(removeJob.id, v.reason);
+            setRemoveJob(null);
+            setSel(null);
+            reload();
+            showToast(`${r.id} raised: removal of ${r.jobId} (${formatMoney(r.costOMR)}, ${formatHours(r.manhours)}). Awaiting ${r.approver}.`, 'warn');
+          }}
+        />
+      )}
 
       <Drawer open={Boolean(sel)} onClose={() => setSel(null)} title={sel ? `${sel.id} · ${sel.tag}` : ''} subtitle={sel ? `${areaLabel(sel.area)} · ${sel.discipline}` : ''}>
         {sel && (
@@ -86,7 +170,23 @@ export function WorklistTab({ jobs, reload }: { jobs: Job[]; reload: () => void 
               <StatusChip status={STATUS_LABEL(sel)} tone={sel.status === 'approved' ? 'good' : sel.status === 'rejected' ? 'crit' : 'warn'} />
               <Chip tone={sel.taClass === 'TA' ? 'accent' : 'neutral'}>{sel.taClass}</Chip>
               <Chip tone={BAND_TONE[riskBand(riskScore(sel))]}>Risk {riskScore(sel)} {riskBand(riskScore(sel))}</Chip>
+              <PhaseChip phase={phaseOf(sel, scope)} />
+              {scope.openVarByJob[sel.id] && <Chip tone="warn">{scope.openVarByJob[sel.id].id} pending</Chip>}
             </div>
+            {staff && sel.costOMR === 0 && (
+              <div className="callout callout-warn">
+                No budgetary estimate yet, so the item is incomplete and blocks the freeze. <button className="btn btn-sm" onClick={() => { setEstJob(sel); setSel(null); }}>AI budget estimate</button>
+              </div>
+            )}
+            {scope.stage === 'frozen' && sel.inBaseline && sel.status === 'approved' && !scope.openVarByJob[sel.id] && staff && (
+              <div className="callout callout-warn">
+                Part of the frozen baseline: a change or removal needs a variation.
+                <div className="row" style={{ marginTop: 6 }}>
+                  <ActionButton onClick={() => { setChangeJob(sel); setSel(null); }} data-testid="request-change">Request change</ActionButton>
+                  <ActionButton variant="danger" onClick={() => { setRemoveJob(sel); setSel(null); }} data-testid="request-removal">Request removal</ActionButton>
+                </div>
+              </div>
+            )}
             <IdChips p6Id={sel.status === 'approved' || sel.inBaseline ? p6IdForJob(sel) : undefined} sapWo={sapWoForJob(sel)} sapNotif={sapNotificationForJob(sel)} />
             <dl className="kv">
               <dt>Originator</dt><dd>{sel.requestedBy}</dd>

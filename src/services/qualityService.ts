@@ -1,4 +1,4 @@
-import { issues, ncrs, lossEvents, type Issue, type IssueStatus, type Ncr, type NcrStatus, type LossEvent } from '../mocks/qualityMock';
+import { EQUIPMENT_RATE, issues, ncrs, lossEvents, type Issue, type IssueStatus, type Ncr, type NcrStatus, type LossEvent } from '../mocks/qualityMock';
 import { STATUS_DATE, daysBetween } from '../mocks/_gen';
 import { createCollection } from './_collection';
 
@@ -53,7 +53,7 @@ const lossStore = createCollection<LossEvent>(lossEvents);
 
 export const listLosses = () => lossStore.list();
 
-export async function createLoss(input: Omit<LossEvent, 'id' | 'costOMR'>): Promise<LossEvent> {
-  const ev: LossEvent = { ...input, id: `LOS-${losSeq++}`, costOMR: Math.round(input.hours * 14.5) };
+export async function createLoss(input: Omit<LossEvent, 'id' | 'costOMR' | 'equipCostOMR'>): Promise<LossEvent> {
+  const ev: LossEvent = { ...input, id: `LOS-${losSeq++}`, costOMR: Math.round(input.hours * 14.5), equipCostOMR: input.equipment && input.equipHours ? Math.round(input.equipHours * EQUIPMENT_RATE[input.equipment]) : undefined };
   return lossStore.add(ev);
 }

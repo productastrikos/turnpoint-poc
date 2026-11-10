@@ -2,8 +2,10 @@
 import { delay } from './_util';
 import { addFieldUpdate, } from './p6Service';
 import { logMessage } from './integrationService';
+import { addToolReport, type ToolReportInput } from './toolsService';
+import { applyHseEntry, type HseEntryPayload } from './hseService';
 
-export type QueuedKind = 'progress' | 'approval' | 'photo' | 'gps' | 'scan';
+export type QueuedKind = 'progress' | 'approval' | 'photo' | 'gps' | 'scan' | 'tool-report' | 'hse';
 
 export interface QueuedAction {
   id: string;
@@ -14,6 +16,11 @@ export interface QueuedAction {
   status: 'queued' | 'syncing' | 'synced';
   activityId?: string;
   pct?: number;
+  /** Tool report or HSE entry carried to the platform when this action syncs. */
+  tool?: ToolReportInput;
+  hse?: HseEntryPayload;
+  /** What the platform did with it once synced (shown on the phone). */
+  result?: string;
 }
 
 export interface MobileState {
@@ -68,7 +75,14 @@ export async function sync(): Promise<number> {
     } else if (q.kind === 'approval') {
       logMessage({ system: 'SAP', direction: 'Outbound', object: 'Maintenance Order status', key: q.label, status: 'Delivered', latencyMs: 330, channel: 'OData V2 / OAuth 2.0 + mTLS', note: 'Approval from the mobile app applied' });
     }
-    set({ queue: state.queue.map((x) => (x.id === q.id ? { ...x, status: 'synced' } : x)) });
+    let result: string | undefined;
+    if (q.kind === 'tool-report' && q.tool) {
+      const rep = await addToolReport(q.tool);
+      result = `Report ${rep.id} received. Tool crib notified${rep.critical ? `, ${rep.p6Id} is a critical or near-critical activity` : ''}.`;
+    } else if (q.kind === 'hse' && q.hse) {
+      result = (await applyHseEntry(q.hse)).message;
+    }
+    set({ queue: state.queue.map((x) => (x.id === q.id ? { ...x, status: 'synced', result } : x)) });
   }
   set({ syncing: false, lastSyncAt: clock() });
   return todo.length;
@@ -76,4 +90,9 @@ export async function sync(): Promise<number> {
 
 export function clearSynced() {
   set({ queue: state.queue.filter((q) => q.status !== 'synced') });
+}
+
+/** Drop queued/synced actions of the given kinds (used by the "Reset demo" buttons of the tools and contractor KPI pages). */
+export function discardQueued(kinds: QueuedKind[]) {
+  set({ queue: state.queue.filter((q) => !kinds.includes(q.kind)) });
 }

@@ -22,7 +22,7 @@ function SystemCard({ title, seen, path, split, steps }: { title: string; seen?:
       <CardHeader title={<span>{title} <SimBadge kind="simulated" title="A stand-in console for the demo, not the client's system" /></span>} action={<Chip tone={live ? 'good' : 'neutral'}>{live ? 'connected' : ago(seen)}</Chip>} />
       <div className="row-wrap" style={{ marginBottom: 12 }}>
         <button className="btn btn-primary" onClick={() => window.open(path, path, 'width=1440,height=900')}>Open in its own window ↗</button>
-        <a className="btn" href={split} target="_blank" rel="noreferrer">Side by side with TURNPOINT ↗</a>
+        <a className="btn" href={split} target="_blank" rel="noreferrer">Side by side with OQ ↗</a>
       </div>
       <div className="eyebrow" style={{ marginBottom: 6 }}>Try this</div>
       <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
@@ -42,7 +42,7 @@ export function LiveSyncTab() {
   return (
     <div className="stack" style={{ gap: 16 }}>
       <div className="callout">
-        The two consoles stand in for the client's SAP S/4HANA and Primavera P6. Each opens as a separate system with its own data, and exchanges messages with TURNPOINT over a local integration bus using the real interface field names (SAP API_MAINTNOTIFICATION / API_MAINTENANCEORDER, P6 activity dates and float). A change made there shows up here within a second, and approvals, the scope freeze, merges and field progress made here show up there. In production the same messages travel through SAP Integration Suite (OData) and the P6 EPPM REST API.
+        The two consoles stand in for the client's SAP S/4HANA and Primavera P6. Each opens as a separate system with its own data, and exchanges messages with OQ over a local integration bus using the real interface field names (SAP API_MAINTNOTIFICATION / API_MAINTENANCEORDER, P6 activity dates and float). A change made there shows up here within a second, and approvals, the scope freeze, merges and field progress made here show up there. In production the same messages travel through SAP Integration Suite (OData) and the P6 EPPM REST API.
       </div>
       <div className="grid grid-2" style={{ alignItems: 'start' }}>
         <SystemCard
@@ -51,10 +51,10 @@ export function LiveSyncTab() {
           path="/ext/sap"
           split="/ext/split?left=/scope&right=sap"
           steps={[
-            'SAP: Notifications > Create > example "V-102 nozzle N4 corrosion" > Save. TURNPOINT raises a new scope item at Gate 1 and the AI flags it as a likely duplicate of J-2207.',
-            'SAP: Maintenance orders > 4000031187 (E-204 retube) > raise the planned cost > Save. The J-2202 estimate and the scope budget roll-up change in TURNPOINT.',
-            'TURNPOINT: Scope > 3-gate approvals > approve J-2232 at Gate 3. SAP shows order 4000033232 released with user status APRV, changed by TURNPOINT_INT.',
-            'TURNPOINT: Scope > Worklist > merge J-2235 into J-2230. SAP notification 100051988 is completed as a duplicate.',
+            'SAP: Notifications > Create > example "V-102 nozzle N4 corrosion" > Save. OQ raises a new scope item at Gate 1 and the AI flags it as a likely duplicate of J-2207.',
+            'SAP: Maintenance orders > 4000031187 (E-204 retube) > raise the planned cost > Save. The J-2202 estimate and the scope budget roll-up change in OQ.',
+            'OQ: Scope > 3-gate approvals > approve J-2232 at Gate 3. SAP shows order 4000033232 released with user status APRV, changed by OQ_INT.',
+            'OQ: Scope > Worklist > merge J-2235 into J-2230. SAP notification 100051988 is completed as a duplicate.',
           ]}
         />
         <SystemCard
@@ -63,9 +63,9 @@ export function LiveSyncTab() {
           path="/ext/p6"
           split="/ext/split?left=/critical-path&right=p6"
           steps={[
-            'P6: double-click Rem Dur on CDU-2020 (E-204 Retube), change 4 to 7, Enter, then Schedule (F9). TURNPOINT moves CPA-005 / 014 / 010, the TA end goes from 05 Sep to 07 Sep, the critical path switches from CP1 to CP2 and the change counter goes up.',
-            'TURNPOINT: Mobile field app > record progress on T-201 Tray Repair. P6 shows the new % complete and remaining duration; Schedule (F9) sends the recalculated dates back.',
-            'TURNPOINT: AI Analytics > Risk prediction recomputes from the new dates.',
+            'P6: double-click Rem Dur on CDU-2020 (E-204 Retube), change 4 to 7, Enter, then Schedule (F9). OQ moves CPA-005 / 014 / 010, the TA end goes from 05 Sep to 07 Sep, the critical path switches from CP1 to CP2 and the change counter goes up.',
+            'OQ: Mobile field app > record progress on T-201 Tray Repair. P6 shows the new % complete and remaining duration; Schedule (F9) sends the recalculated dates back.',
+            'OQ: AI Analytics > Risk prediction recomputes from the new dates.',
           ]}
         />
       </div>
@@ -77,7 +77,7 @@ export function LiveSyncTab() {
               className="btn btn-sm"
               onClick={() => {
                 sendToSystems({ type: 'reset' });
-                showToast('Stand-in consoles reset to their seed data. Use Reset demo data (profile menu) to reset TURNPOINT too.', 'accent');
+                showToast('Stand-in consoles reset to their seed data. Use Reset demo data (profile menu) to reset OQ too.', 'accent');
               }}
             >
               Reset stand-ins
@@ -92,7 +92,7 @@ export function LiveSyncTab() {
               <div style={{ minWidth: 0 }}>
                 <div className="row-wrap" style={{ gap: 6 }}>
                   <span className={`tag-chip ${m.system === 'SAP' ? 'sap' : 'p6'}`}>{m.system}</span>
-                  <Chip tone={m.direction === 'Inbound' ? 'accent' : 'neutral'}>{m.direction === 'Inbound' ? `${m.system} → TURNPOINT` : `TURNPOINT → ${m.system}`}</Chip>
+                  <Chip tone={m.direction === 'Inbound' ? 'accent' : 'neutral'}>{m.direction === 'Inbound' ? `${m.system} → OQ` : `OQ → ${m.system}`}</Chip>
                   <strong style={{ fontSize: 13 }}>{m.object}</strong>
                   <span className="mono small muted">{m.key}</span>
                 </div>

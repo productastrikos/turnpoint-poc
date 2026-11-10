@@ -72,14 +72,14 @@ export async function getMailPreview(alert: AlertItem): Promise<MailPreview> {
   }
   const sev = alert.severity === 'crit' ? 'URGENT' : alert.severity === 'warn' ? 'Action' : 'FYI';
   const preview: MailPreview = {
-    from: 'TURNPOINT Notifications <no-reply@turnpoint.example>',
+    from: 'OQ Notifications <no-reply@oq.example>',
     to: route.to,
     cc: route.cc,
-    subject: `[TURNPOINT] ${sev}: ${TYPE_LABEL[alert.type]}: ${trim(alert.message, 80)}`,
+    subject: `[OQ] ${sev}: ${TYPE_LABEL[alert.type]}: ${trim(alert.message, 80)}`,
     greeting: route.greeting,
     paragraphs: [alert.message, route.ask],
-    action: alert.link ? { label: 'Open in TURNPOINT', to: alert.link } : undefined,
-    footer: 'You receive this message because you are the approver of record for this workflow. It was generated automatically by TURNPOINT. Replies are not monitored.',
+    action: alert.link ? { label: 'Open in OQ', to: alert.link } : undefined,
+    footer: 'You receive this message because you are the approver of record for this workflow. It was generated automatically by OQ. Replies are not monitored.',
   };
   return delay(preview);
 }

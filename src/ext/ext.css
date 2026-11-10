@@ -1,5 +1,5 @@
 /* Stand-in consoles for the client's SAP S/4HANA and Primavera P6 (demo only). Scoped by .sapx / .p6x so nothing
-   leaks into TURNPOINT. Both use their own light look on purpose: they must read as a different system. */
+   leaks into OQ. Both use their own light look on purpose: they must read as a different system. */
 
 .ext-ribbon {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
@@ -143,3 +143,17 @@
 .splitx-btn.reset { background: transparent; border-color: #475569; color: #cfd8e3; }
 .splitx-btn.reset:hover { background: #1e293b; }
 .splitx-last { margin-left: 6px; font-weight: 500; opacity: .8; }
+
+/* SAP stand-in: banner when OQ has just sent something, and the narrow layout used when SAP is docked beside OQ */
+.sapx-banner { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; background: var(--s-good-soft); border: 1px solid #a5d8b4; color: var(--s-good); font-size: 13.5px; animation: sapx-in .35s ease-out; }
+.sapx-banner-tick { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--s-good); color: #fff; font-weight: 800; font-size: 13px; flex: none; }
+@keyframes sapx-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.sapx.compact .sapx-page { padding: 12px 14px; }
+.sapx.compact .sapx-head p { display: none; }
+.sapx.compact .sapx-kpis { grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 10px 0; }
+.sapx.compact .sapx-kpi { padding: 8px 12px; }
+.sapx.compact .sapx-kpi .v { font-size: 22px; }
+.sapx.compact .sapx-table th:nth-child(3), .sapx.compact .sapx-table td:nth-child(3),
+.sapx.compact .sapx-table th:nth-child(5), .sapx.compact .sapx-table td:nth-child(5) { display: none; }
+.sapx.compact .sapx-search { width: 160px; }
+.sapx.compact .ext-ribbon { display: none; }

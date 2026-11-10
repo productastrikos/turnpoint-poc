@@ -1,12 +1,14 @@
 // System of record of the SAP S/4HANA stand-in console (/ext/sap): maintenance orders and notifications, seeded from
-// the same SAP numbers TURNPOINT shows, then kept separately like a real system. Planner actions here (new notification,
-// changed order) are published to TURNPOINT; TURNPOINT's approvals, freeze, merges and SCFs arrive on the bus and are
-// written to the orders with the technical user TURNPOINT_INT, as an Integration Suite flow would.
-import { jobs } from '../mocks/jobsMock';
+// the same SAP numbers OQ shows, then kept separately like a real system. Planner actions here (new notification,
+// changed order) are published to OQ; OQ's approvals, freeze, merges and SCFs arrive on the bus and are
+// written to the orders with the technical user OQ_INT, as an Integration Suite flow would.
+import { openingJobs } from '../mocks/jobsMock';
+
+const jobs = openingJobs();
 import { SAP_PENDING } from '../mocks/integrationMock';
 import { sapWoForJob } from '../mocks/sapKeys';
 import { unitOf } from '../mocks/master';
-import { publish, stampNow, subscribe, type Envelope, type FieldChange, type SapNotification, type SapOrder } from './bus';
+import { publish, stampNow, subscribe, type Envelope, type FieldChange, type SapNotification, type SapOrder, type ScopeSapItem } from './bus';
 import type { Discipline, Job } from '../types';
 
 export interface SapLogEntry {
@@ -35,12 +37,12 @@ function seedOrders(): SapOrder[] {
       FunctionalLocation: funcLoc(j.area, j.tag),
       MaintPriority: prio(j),
       SystemStatusText: j.status === 'approved' || j.inBaseline ? 'REL' : 'CRTD',
-      UserStatusText: j.inBaseline ? 'SFRZ' : j.status === 'approved' ? 'APRV' : 'TPSC',
+      UserStatusText: j.inBaseline ? 'SFRZ' : j.status === 'approved' ? 'APRV' : j.gate === 3 ? 'GT2' : j.gate === 2 ? 'GT1' : 'TPSC',
       MaintenancePlannerGroup: PLANNER_GROUP[j.discipline],
       WBSElement: `TA26.${unitOf(j.area)}`,
       PlannedCostOMR: j.costOMR,
       MaintenanceNotification: j.source === 'SAP notification' ? j.sapRef : undefined,
-      LastChangedBy: j.inBaseline ? 'TURNPOINT_INT' : 'PLANNER01',
+      LastChangedBy: j.inBaseline ? 'OQ_INT' : 'PLANNER01',
       LastChangeDateTime: j.inBaseline ? '12.06.2026 10:20:00' : `${j.createdAt.slice(8, 10)}.${j.createdAt.slice(5, 7)}.2026 09:00:00`,
       ZZ_TurnpointRef: j.id,
     }));
@@ -92,17 +94,28 @@ export const EXAMPLE_NOTIFICATIONS: Omit<SapNotification, 'MaintenanceNotificati
 
 // ---------------------------------------------------------------- store
 
+/** What OQ has just sent, for the banner at the top of the console and for switching to the right tab. */
+export interface InboundFromOq {
+  at: number;
+  count: number;
+  label: string;
+  tab: 'orders' | 'notifications';
+}
+
 export interface SapState {
   orders: SapOrder[];
   notifications: SapNotification[];
   log: SapLogEntry[];
   /** Keys changed in the last few seconds, for the row highlight. */
   flash: string[];
+  /** Keys OQ touched in the last half minute, listed first so the change is visible without scrolling. */
+  pinned: string[];
+  inbound: InboundFromOq | null;
   connected: boolean;
 }
 
 let nextNotif = 100052001;
-const fresh = (): SapState => ({ orders: seedOrders(), notifications: seedNotifications(), log: [], flash: [], connected: false });
+const fresh = (): SapState => ({ orders: seedOrders(), notifications: seedNotifications(), log: [], flash: [], pinned: [], inbound: null, connected: false });
 let state = fresh();
 const listeners = new Set<() => void>();
 const set = (patch: Partial<SapState>) => {
@@ -115,6 +128,19 @@ function flash(key: string) {
   setTimeout(() => set({ flash: state.flash.filter((k) => k !== key) }), 4500);
 }
 
+/** Remember that OQ just changed these rows: banner counter (grouped within 6 s), pin to the top, switch tab. */
+function noteInbound(label: string, tab: InboundFromOq['tab'], keys: string[]) {
+  const cur = state.inbound;
+  const grouped = cur !== null && Date.now() - cur.at < 6000 && cur.tab === tab;
+  set({
+    inbound: { at: Date.now(), count: (grouped ? cur.count : 0) + keys.length, label: grouped ? cur.label : label, tab },
+    pinned: [...keys, ...state.pinned.filter((k) => !keys.includes(k))].slice(0, 80),
+  });
+  setTimeout(() => {
+    if (state.pinned.some((k) => keys.includes(k))) set({ pinned: state.pinned.filter((k) => !keys.includes(k)) });
+  }, 30_000);
+}
+
 export const getSapState = () => state;
 export function subscribeSap(fn: () => void) {
   listeners.add(fn);
@@ -123,12 +149,12 @@ export function subscribeSap(fn: () => void) {
   };
 }
 
-/** Planner creates a notification in SAP: it is sent to TURNPOINT straight away (event-driven integration). */
+/** Planner creates a notification in SAP: it is sent to OQ straight away (event-driven integration). */
 export function createNotification(input: Omit<SapNotification, 'MaintenanceNotification' | 'CreationDate' | 'NotifProcessingPhaseDesc'>): SapNotification {
   const n: SapNotification = { ...input, MaintenanceNotification: String(nextNotif++), CreationDate: '2026-08-16', NotifProcessingPhaseDesc: 'Outstanding' };
   set({
     notifications: [n, ...state.notifications],
-    log: log({ user: 'PLANNER01', dir: 'out', object: `Notification ${n.MaintenanceNotification}`, text: `Created "${n.NotificationText}" (${n.NotificationType}, priority ${n.MaintPriority}). Event sent to TURNPOINT.` }),
+    log: log({ user: 'PLANNER01', dir: 'out', object: `Notification ${n.MaintenanceNotification}`, text: `Created "${n.NotificationText}" (${n.NotificationType}, priority ${n.MaintPriority}). Event sent to OQ.` }),
   });
   flash(n.MaintenanceNotification);
   publish('SAP', { type: 'sap.notification.created', notification: n });
@@ -137,7 +163,7 @@ export function createNotification(input: Omit<SapNotification, 'MaintenanceNoti
 
 const ORDER_LABEL: Partial<Record<keyof SapOrder, string>> = { PlannedCostOMR: 'Planned cost (OMR)', MaintPriority: 'Priority', SystemStatusText: 'System status', UserStatusText: 'User status', MaintenanceOrderDesc: 'Description' };
 
-/** Planner changes an order in SAP: changed fields go to TURNPOINT. */
+/** Planner changes an order in SAP: changed fields go to OQ. */
 export function changeOrder(order: string, patch: Partial<SapOrder>): FieldChange[] {
   const cur = state.orders.find((o) => o.MaintenanceOrder === order);
   if (!cur) return [];
@@ -148,7 +174,7 @@ export function changeOrder(order: string, patch: Partial<SapOrder>): FieldChang
   const updated: SapOrder = { ...cur, ...patch, LastChangedBy: 'PLANNER01', LastChangeDateTime: stampNow() };
   set({
     orders: state.orders.map((o) => (o.MaintenanceOrder === order ? updated : o)),
-    log: log({ user: 'PLANNER01', dir: 'out', object: `Order ${order}`, text: `${changes.map((c) => `${c.label}: ${c.from} → ${c.to}`).join('; ')}. Change sent to TURNPOINT.` }),
+    log: log({ user: 'PLANNER01', dir: 'out', object: `Order ${order}`, text: `${changes.map((c) => `${c.label}: ${c.from} → ${c.to}`).join('; ')}. Change sent to OQ.` }),
   });
   flash(order);
   publish('SAP', { type: 'sap.order.changed', order: updated, changes });
@@ -169,7 +195,7 @@ export function connectSap(): () => void {
       const n = /^sap\.notification\.(\d)$/.exec(m.action);
       if (n) createNotification(EXAMPLE_NOTIFICATIONS[Number(n[1])]);
       else if (m.action === 'sap.cost.up') {
-        // raise the planned cost of an order that is already a TURNPOINT scope item by 20%
+        // raise the planned cost of an order that is already a OQ scope item by 20%
         const o = state.orders.find((x) => x.ZZ_TurnpointRef && x.PlannedCostOMR > 0);
         if (o) changeOrder(o.MaintenanceOrder, { PlannedCostOMR: Math.round((o.PlannedCostOMR * 1.2) / 100) * 100 });
       }
@@ -179,10 +205,42 @@ export function connectSap(): () => void {
       if (m.ping) publish('SAP', { type: 'hello', system: 'SAP' });
       return set({ connected: true });
     }
+    if (m.type === 'tp.scope.created') {
+      // OQ created scope items (manual entry, bulk upload, Excel import): open one maintenance order each, then acknowledge.
+      const made: SapOrder[] = m.items.map((it: ScopeSapItem) => {
+        const r = it.likelihood * it.consequence;
+        return {
+          MaintenanceOrder: it.order,
+          MaintenanceOrderDesc: it.desc,
+          MaintenanceOrderType: 'PM02',
+          Equipment: it.tag,
+          FunctionalLocation: funcLoc(it.area, it.tag),
+          MaintPriority: (r >= 16 ? '1' : r >= 10 ? '2' : r >= 5 ? '3' : '4') as SapOrder['MaintPriority'],
+          SystemStatusText: 'CRTD',
+          UserStatusText: 'TPSC',
+          MaintenancePlannerGroup: PLANNER_GROUP[it.discipline],
+          WBSElement: `TA26.${unitOf(it.area)}`,
+          PlannedCostOMR: it.costOMR,
+          LastChangedBy: 'OQ_INT',
+          LastChangeDateTime: stampNow(),
+          ZZ_TurnpointRef: it.ref,
+        };
+      });
+      const keys = made.map((o) => o.MaintenanceOrder);
+      set({
+        connected: true,
+        orders: [...made, ...state.orders.filter((o) => !keys.includes(o.MaintenanceOrder))],
+        log: log({ user: 'OQ_INT', dir: 'in', object: `${made.length} order${made.length === 1 ? '' : 's'} (${m.channel})`, text: `Created from OQ: ${made.map((o) => `${o.MaintenanceOrder} ${o.Equipment}`).slice(0, 4).join(', ')}${made.length > 4 ? ` and ${made.length - 4} more` : ''}. Status CRTD, user status TPSC (in TA scoping).` }),
+      });
+      keys.forEach(flash);
+      noteInbound(`${made.length} maintenance order${made.length === 1 ? '' : 's'} created from OQ (${m.channel})`, 'orders', keys);
+      publish('SAP', { type: 'sap.scope.confirmed', batch: m.batch, orders: m.items.map((it: ScopeSapItem) => ({ ref: it.ref, order: it.order })) });
+      return;
+    }
     if (m.type === 'tp.order.upsert') {
       const cur = state.orders.find((o) => o.MaintenanceOrder === m.order.MaintenanceOrder);
       const merged: SapOrder = cur
-        ? { ...cur, ...m.order, LastChangedBy: 'TURNPOINT_INT', LastChangeDateTime: stampNow() }
+        ? { ...cur, ...m.order, LastChangedBy: 'OQ_INT', LastChangeDateTime: stampNow() }
         : {
             MaintenanceOrderDesc: '',
             MaintenanceOrderType: 'PM02',
@@ -195,16 +253,17 @@ export function connectSap(): () => void {
             WBSElement: 'TA26',
             PlannedCostOMR: 0,
             ...m.order,
-            LastChangedBy: 'TURNPOINT_INT',
+            LastChangedBy: 'OQ_INT',
             LastChangeDateTime: stampNow(),
           };
       const fields = Object.keys(m.order).filter((k) => k !== 'MaintenanceOrder' && k !== 'ZZ_TurnpointRef');
       set({
         connected: true,
         orders: cur ? state.orders.map((o) => (o.MaintenanceOrder === merged.MaintenanceOrder ? merged : o)) : [merged, ...state.orders],
-        log: log({ user: 'TURNPOINT_INT', dir: 'in', object: `Order ${merged.MaintenanceOrder}`, text: `${cur ? 'Changed' : 'Created'} from TURNPOINT: ${m.note}${cur ? ` (${fields.map((k) => `${ORDER_LABEL[k as keyof SapOrder] ?? k} ${String((m.order as Record<string, unknown>)[k])}`).join(', ')})` : ''}.` }),
+        log: log({ user: 'OQ_INT', dir: 'in', object: `Order ${merged.MaintenanceOrder}`, text: `${cur ? 'Changed' : 'Created'} from OQ: ${m.note}${cur ? ` (${fields.map((k) => `${ORDER_LABEL[k as keyof SapOrder] ?? k} ${String((m.order as Record<string, unknown>)[k])}`).join(', ')})` : ''}.` }),
       });
       flash(merged.MaintenanceOrder);
+      noteInbound(`${cur ? 'Order status changed' : 'Order created'} from OQ: ${m.note}`, 'orders', [merged.MaintenanceOrder]);
     }
     if (m.type === 'tp.notification.update') {
       const cur = state.notifications.find((n) => n.MaintenanceNotification === m.MaintenanceNotification);
@@ -212,9 +271,10 @@ export function connectSap(): () => void {
       set({
         connected: true,
         notifications: state.notifications.map((n) => (n.MaintenanceNotification === m.MaintenanceNotification ? { ...n, NotifProcessingPhaseDesc: m.phase, ZZ_TurnpointRef: m.ref ?? n.ZZ_TurnpointRef } : n)),
-        log: log({ user: 'TURNPOINT_INT', dir: 'in', object: `Notification ${m.MaintenanceNotification}`, text: `Status ${m.phase} from TURNPOINT: ${m.note}.` }),
+        log: log({ user: 'OQ_INT', dir: 'in', object: `Notification ${m.MaintenanceNotification}`, text: `Status ${m.phase} from OQ: ${m.note}.` }),
       });
       flash(m.MaintenanceNotification);
+      noteInbound(`Notification status from OQ: ${m.note}`, 'notifications', [m.MaintenanceNotification]);
     }
   });
   publish('SAP', { type: 'hello', system: 'SAP', ping: true });

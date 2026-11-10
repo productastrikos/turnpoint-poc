@@ -108,7 +108,7 @@ export function MonitoringTab() {
           columns={[
             { key: 'field', header: 'Data', render: (o) => <strong>{o.field}</strong> },
             { key: 'p6', header: 'Primavera P6', render: (o) => <Chip tone={o.p6 === 'Owner' ? 'accent' : 'neutral'}>{o.p6}</Chip> },
-            { key: 'sto', header: 'TURNPOINT', render: (o) => <Chip tone={o.sto === 'Owner' ? 'accent' : 'neutral'}>{o.sto}</Chip> },
+            { key: 'sto', header: 'OQ', render: (o) => <Chip tone={o.sto === 'Owner' ? 'accent' : 'neutral'}>{o.sto}</Chip> },
             { key: 'sap', header: 'SAP S/4HANA', render: (o) => <Chip tone={o.sap === 'Owner' ? 'accent' : 'neutral'}>{o.sap}</Chip> },
             { key: 'rule', header: 'Conflict rule', render: (o) => <span className="small">{o.rule}</span> },
           ]}

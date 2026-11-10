@@ -16,6 +16,7 @@ import { shortDate } from '../../mocks/_gen';
 import { getRiskForecast, type RiskForecast } from '../../services/predictionService';
 import { dayLabel, pct, riskTone } from '../ai-panel/riskFormat';
 import { useDataEvent } from '../../app/dataEvents';
+import { FaultyToolsWidget } from '../tools-tracking/FaultyToolsWidget';
 import { getLiveEvents, subscribeLive } from '../../integration/turnpointLink';
 
 const KPI_LINK: Record<string, string> = {
@@ -187,6 +188,10 @@ export default function DashboardPage() {
             </div>
           )}
         </Card>
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <FaultyToolsWidget title="Contractor tools: faulty and missing list" />
       </div>
     </div>
   );

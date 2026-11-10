@@ -43,6 +43,8 @@ const PidAnalyzer = L(() => import('../modules/pid-analyzer/PidAnalyzerPage'));
 const Lookahead = L(() => import('../modules/lookahead/LookaheadPage'));
 const Mobilization = L(() => import('../modules/mobilization/MobilizationPage'));
 const Attendance = L(() => import('../modules/attendance/AttendancePage'));
+const ToolsTracking = L(() => import('../modules/tools-tracking/ToolsTrackingPage'));
+const PreTaRework = L(() => import('../modules/rework/PreTaReworkPage'));
 const PreTa = L(() => import('../modules/pre-ta/PreTaTrackerPage'));
 const FieldChecklists = L(() => import('../modules/field-checklists/FieldChecklistsPage'));
 const Productivity = L(() => import('../modules/productivity/ProductivityPage'));
@@ -106,6 +108,8 @@ export const PAGES: Record<ModuleId, ReactElement> = {
   'pre-ta-weld': <PreTa slug="weld" />,
   'pre-ta-rigging': <PreTa slug="rigging" />,
   'pre-ta-tools': <PreTa slug="tools" />,
+  'tools-tracking': <ToolsTracking />,
+  'pre-ta-rework': <PreTaRework />,
   'pre-ta-bagging': <PreTa slug="bagging-tagging" />,
   'pre-ta-heavy': <PreTa slug="heavy-equipment" />,
   'pre-ta-prefab': <PreTa slug="prefab" />,

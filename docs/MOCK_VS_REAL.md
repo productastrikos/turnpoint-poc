@@ -1,6 +1,6 @@
-# TURNPOINT: what is real and what is mocked
+# OQ: what is real and what is mocked
 
-TURNPOINT is a **proof of concept that runs in the browser**. There is no database and no connection to any OQ RPI system.
+OQ is a **proof of concept that runs in the browser**. There is no database and no connection to any OQ RPI system.
 All data is seeded in `src/mocks` and held in memory behind an async service layer in `src/services`, so a real API can replace it later without touching components.
 Reloading the page (or pressing **Reset** in the top bar) restores the seed data.
 Two optional calls leave the machine, both through a localhost-only relay (`vite-relay.ts`) that keeps the keys in `.env.local`: the assistant to Claude (needs `ANTHROPIC_API_KEY`) and read-only reads of SAP's public API sandbox (needs `SAP_API_KEY`). With no keys the demo runs fully offline.
@@ -15,7 +15,7 @@ Two optional calls leave the machine, both through a localhost-only relay (`vite
 | Cross-page consistency | Real: the same jobs, activities, contractors and numbers feed every page (e.g. approving a variation changes the budget bridge) |
 | AI duplicate scope detection (S9) | A pairwise logistic-regression model trains in the browser on a generated history of labelled pairs (hold-out AUC 0.98), scores the live worklist, new items as they are typed, Excel imports and SAP pulls, and retrains on every "merge" / "not a duplicate" decision |
 | AI risk prediction, schedule forecast, predictive critical path (G12, X16, X17) | A slip classifier per activity (AUC 0.74) feeds a 2,000-run Monte Carlo over the CP1-CP3 network: chance of the 05 Sep forecast, P50 / P90, criticality index, and each recommended action re-simulated with the same random draws |
-| Two-way sync with SAP and P6 stand-ins | TURNPOINT and the stand-in consoles (`/ext/sap`, `/ext/p6`, side by side at `/ext/split`) exchange real messages over a browser `BroadcastChannel`. The P6 stand-in runs a real CPM (forward / backward pass, leads, lags, constraints): extending E-204 by 3 days moves the TA end from 05 Sep to 07 Sep and flips the driving path to CP2 |
+| Two-way sync with SAP and P6 stand-ins | OQ and the stand-in consoles (`/ext/sap`, `/ext/p6`, side by side at `/ext/split`) exchange real messages over a browser `BroadcastChannel`. The P6 stand-in runs a real CPM (forward / backward pass, leads, lags, constraints): extending E-204 by 3 days moves the TA end from 05 Sep to 07 Sep and flips the driving path to CP2 |
 | Assistant (G13) | Each answer reads the live services through 11 tools (cost figures are removed in code for contractors). With a key it is Claude, otherwise an on-device engine composes the answer from the same tool data. The badge says which |
 | Files | The P6 tab downloads a generated `.xer` text file; CSV exports and print views work |
 

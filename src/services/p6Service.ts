@@ -202,7 +202,7 @@ function tab(...cols: (string | number)[]): string {
 export function buildXer(): string {
   const dd = `${P6_PROJECT.dataDate} 08:00`;
   const lines: string[] = [];
-  lines.push(tab('ERMHDR', '24.12', P6_PROJECT.dataDate, 'Project', 'turnpoint_sim', 'TURNPOINT STO Platform (SIMULATED EXPORT)', 'dbxDatabaseNoName', 'Project Management', 'USD'));
+  lines.push(tab('ERMHDR', '24.12', P6_PROJECT.dataDate, 'Project', 'turnpoint_sim', 'OQ STO Platform (SIMULATED EXPORT)', 'dbxDatabaseNoName', 'Project Management', 'USD'));
   lines.push('%T\tPROJECT');
   lines.push(tab('%F', 'proj_id', 'proj_short_name', 'last_recalc_date', 'plan_start_date', 'scd_end_date'));
   lines.push(tab('%R', 1001, P6_PROJECT.project, dd, '2026-08-03 06:00', '2026-09-03 18:00'));

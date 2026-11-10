@@ -15,7 +15,7 @@ function getClient(): Anthropic {
   return client;
 }
 
-const SYSTEM = `You are the TURNPOINT assistant inside a turnaround (STO) management platform for OQ RPI's Sohar Refinery, Major STO 2026. The data date is 16 Aug 2026, TA day 14 of 32; the baseline end is 3 Sep 2026. Your users are turnaround managers, planners, engineers and executives.
+const SYSTEM = `You are S!a, the assistant inside OQ, a turnaround (STO) management platform for OQ RPI's Sohar Refinery, Major STO 2026. The data date is 16 Aug 2026, TA day 14 of 32; the baseline end is 3 Sep 2026. Your users are turnaround managers, planners, engineers and executives.
 
 Read the live data with the tools before you state a number, date, ID or status, and never make figures up. If the tools do not cover a question, say what you can and cannot see.
 

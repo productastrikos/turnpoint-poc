@@ -1,4 +1,4 @@
-# TURNPOINT: Turnaround Digitalization POC
+# OQ: Turnaround Management POC
 
 Browser-based, mock-data prototype of the end-to-end Turnaround / STO management platform OQ RPI is tendering for (SOW "End-to-End Digital Turnaround Solution Platform").
 It is for internal evaluation. **Nothing here is connected to OQ's SAP, Primavera P6 or any live system**: SAP and P6 are stand-in consoles, and the AI models (duplicate scope, risk, forecast) run in the browser on generated training history. See [docs/MOCK_VS_REAL.md](docs/MOCK_VS_REAL.md).
@@ -30,20 +30,20 @@ The **EN / العربية** switch is on the login card and in the top bar; the 
 
 ### Deploying to astrikos.xyz
 
-See **`DEPLOY.md`** (ports 3339 / 4339, pm2, nginx, Cloudflare). The deployed build needs `server/index.mjs` for the assistant and SAP card; everything else is static.
+See **`DEPLOY.md`** (ports 3339 / 4339, pm2, nginx, Cloudflare). The deployed build needs `server/index.mjs` for S!a and the SAP card; everything else is static.
 
 ### Optional keys (`.env.local`)
 
 Copy `.env.example` to `.env.local` and restart. Keys stay in the relay (`server/relay.mjs`: mounted by `vite-relay.ts` locally, run by `server/index.mjs` when deployed) and never reach the browser.
 
-- `ANTHROPIC_API_KEY`: the assistant answers open questions with Claude through tools over the live data. Without it an on-device engine answers the common questions from the same data (the badge in the chat shows which).
+- `ANTHROPIC_API_KEY`: S!a answers open questions with Claude through tools over the live data. Without it an on-device engine answers the common questions from the same data (the badge in the chat shows which).
 - `SAP_API_KEY`: enables the read-only SAP sandbox card in Integration Hub > SAP.
 
 ### Two-way sync demo
 
 The split view (`/ext/split`) opens on the Command Dashboard and has one-click **Demo actions** (three SAP notifications, an SAP cost change, P6 extend / recover E-204 with Schedule F9, and Reset demo). The dashboard shows a "Live from SAP & Primavera P6" feed and refreshes its tiles and AI forecast when a message arrives.
 
-Integration Hub > **Live two-way sync** opens the stand-in **SAP** (`/ext/sap`) and **P6** (`/ext/p6`) consoles, or both beside TURNPOINT at `/ext/split`. Try: send a new notification from SAP (lands in Scope, flagged as a duplicate), approve a Gate 3 item (releases the order in SAP), extend E-204 by 3 days in P6 (TA end 05 Sep to 07 Sep, driving path CP1 to CP2).
+Integration Hub > **Live two-way sync** opens the stand-in **SAP** (`/ext/sap`) and **P6** (`/ext/p6`) consoles, or both beside OQ at `/ext/split`. Try: send a new notification from SAP (lands in Scope, flagged as a duplicate), approve a Gate 3 item (releases the order in SAP), extend E-204 by 3 days in P6 (TA end 05 Sep to 07 Sep, driving path CP1 to CP2).
 
 ## A 5-minute path through the demo
 
@@ -52,7 +52,7 @@ Press **Guided demo** in the top bar for an 11-step storyline across modules, or
 1. **Executive Summary**, then switch **Active TA** (top bar) to see the portfolio rescale the dashboard.
 2. **Integration Hub**: SAP tab, *Pull from SAP*, import items (they land in Scope at Gate 1 with an SAP chip and an AI duplicate check). Live two-way sync tab: the SAP and P6 stand-in consoles. P6 tab: import sample XER, recalculate ALU/RLU, export a generated XER.
 3. **Scope & Worklist**: AI duplicate detection (merge J-2235 into J-2230), three-gate approval, divert a non-TA item, risk matrix, challenge, variations, freeze certificate.
-4. **Work Packs**, **Critical Path** (dependency network, live monitor, change report), **What-if**, **AI Analytics** (21% chance of the 05 Sep forecast; accept the night-crew action and watch it rise to 58%; ask the assistant).
+4. **Work Packs**, **Critical Path** (dependency network, live monitor, change report), **What-if**, **AI Analytics** (21% chance of the 05 Sep forecast; accept the night-crew action and watch it rise to 58%; ask S!a).
 5. **Mobile Field App**: go offline, record progress, come back online and sync.
 6. **View as** Contractor Supervisor: cost and approvals lock; menu items show locks.
 7. **Close-Out Report**: generate the AI draft (templated text).
@@ -86,7 +86,7 @@ Navigation, routing, access control and `/coverage` are all generated from `src/
 | `/kpis` | KPIs & S-Curve |
 | `/readiness` | Overall STO Readiness |
 | `/budget` | Budget Control |
-| `/ai-panel` | AI Assistant & Analytics |
+| `/ai-panel` | S!a & AI Analytics |
 | `/mobile-capture` | Mobile Field App (Offline) |
 | `/integrations` | Integration Hub (SAP · P6) |
 | `/platform` | Platform & Performance |
@@ -179,4 +179,4 @@ Several pages have tabs addressed as `?tab=` (for example `/scope?tab=freeze`); 
 
 ## Honesty rules
 
-Anything simulated (SAP / P6 stand-ins, load test, offline mobile, drawing analysis, close-out draft) carries a **Simulated** or **Illustrative** badge. Trained models carry an **AI model** badge, the assistant shows **Live AI** or **On-device AI**, and the top banner says the prototype is not connected to any live system.
+Anything simulated (SAP / P6 stand-ins, load test, offline mobile, drawing analysis, close-out draft) carries a **Simulated** or **Illustrative** badge. Trained models carry an **AI model** badge, S!a shows **Live AI** or **On-device AI**, and the top banner says the prototype is not connected to any live system.

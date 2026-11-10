@@ -5,6 +5,7 @@ import { ProgressBar } from '../../components/ui/ProgressBar';
 import { advanceDoc, docActionLabel, listDocs } from '../../services/closeoutService';
 import type { HandoverDoc } from '../../mocks/closeoutMock';
 import { Icon } from '../../app/icons';
+import { ConfirmationLetterCard } from './ConfirmationLetterCard';
 
 const pct = (rows: HandoverDoc[]) => Math.round((rows.reduce((s, r) => s + r.received, 0) / Math.max(1, rows.reduce((s, r) => s + r.expected, 0))) * 100);
 
@@ -24,6 +25,8 @@ const config: TrackerConfig<HandoverDoc> = {
     const discs = Array.from(new Set(rows.map((r) => r.discipline)));
     const folders = Array.from(new Set(rows.map((r) => r.archivePath.split('/')[3])));
     return (
+      <div className="stack" style={{ gap: 16 }}>
+      <ConfirmationLetterCard rows={rows} />
       <div className="grid grid-2" style={{ alignItems: 'start' }}>
         <Card>
           <CardHeader title="Completeness by discipline" />
@@ -38,6 +41,7 @@ const config: TrackerConfig<HandoverDoc> = {
             ))}
           </div>
         </Card>
+      </div>
       </div>
     );
   },

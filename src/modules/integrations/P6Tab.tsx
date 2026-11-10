@@ -197,7 +197,7 @@ export function P6Tab() {
                   title="Resource master (read-only)"
                   action={<button className="btn btn-sm" onClick={() => setShowRes((s) => !s)}>{showRes ? 'Hide' : `Show ${getResources().length} resources`}</button>}
                 />
-                <div className="callout"><Icon name="lock" size={14} /> Labour and non-labour resources are owned by P6 and are read-only in TURNPOINT (SOW dry run #6). There are no edit controls here by design.</div>
+                <div className="callout"><Icon name="lock" size={14} /> Labour and non-labour resources are owned by P6 and are read-only in OQ (SOW dry run #6). There are no edit controls here by design.</div>
                 {showRes && (
                   <div style={{ marginTop: 12 }}>
                     <DataTable

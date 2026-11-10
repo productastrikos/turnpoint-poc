@@ -10,7 +10,7 @@ function AssistantTab() {
   return (
     <div className="grid grid-3-2" style={{ alignItems: 'start' }}>
       <Card>
-        <CardHeader title="Ask TURNPOINT" />
+        <CardHeader title="Ask S!a" />
         <AssistantChat minHeight={340} className="chat-inline" />
       </Card>
       <Card>
@@ -31,8 +31,8 @@ export default function AiPanelPage() {
   return (
     <div>
       <PageHeader
-        title="AI Assistant & Analytics"
-        subtitle="Risk prediction, schedule forecast and predictive critical path run a trained slip model and a 2,000-run schedule simulation on the live data, in the browser. The assistant answers questions about the turnaround."
+        title="S!a & AI Analytics"
+        subtitle="Risk prediction, schedule forecast and predictive critical path run a trained slip model and a 2,000-run schedule simulation on the live data, in the browser. S!a answers questions about the turnaround."
         badges={['model']}
         checklist="G12 · G13 · X16 · X17"
       />
@@ -41,7 +41,7 @@ export default function AiPanelPage() {
         onChange={setTab}
         tabs={[
           { id: 'risk', label: 'Risk prediction' },
-          { id: 'assistant', label: 'Assistant' },
+          { id: 'assistant', label: 'S!a' },
           { id: 'forecast', label: 'Schedule forecast' },
           { id: 'predictive', label: 'Predictive critical path' },
         ]}

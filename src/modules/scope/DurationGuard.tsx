@@ -90,7 +90,7 @@ export function DurationGuard({
           <strong>Duration check</strong>
           <SimBadge kind="model" />
         </div>
-        <div className="small" style={{ marginTop: 4 }}>Enter a description, the equipment tag and the planned hours. TURNPOINT AI compares them with past jobs and the live condition of the asset, and warns when the time looks too short.</div>
+        <div className="small" style={{ marginTop: 4 }}>Enter a description, the equipment tag and the planned hours. OQ AI compares them with past jobs and the live condition of the asset, and warns when the time looks too short.</div>
       </div>
     );
   }

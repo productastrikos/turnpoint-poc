@@ -28,3 +28,23 @@ Pre-change snapshot of src/docs: zip `turnpoint-snapshot-before-2026-10-19.zip` 
 1. Add `ANTHROPIC_API_KEY` and test the live assistant; re-record ch10 if you want the film to show Live AI.
 2. Add `SAP_API_KEY`, test the sandbox card, fix field names.
 3. Optional: commit (the folder is not a git repo).
+
+## 1 Nov 2026: PBC 03 response (see docs/PBC03_PLAN.md)
+Built (all demo flows, in memory, with Reset buttons): scope freeze lifecycle + certificate Rev A/B (modules/scope), computed critical path + delay impact + recovery + change report (services/criticalPathService.ts, modules/critical-path), QA/QC PO->ITP->acceptance workflow (modules/qaqc), broken/missing tools + mobile report screens, contractor HSE KPI (toolbox talk, housekeeping), attendance-system sync + mobilization, Pre-TA Re-work Reports, discipline Pre-TA tiles, OQ + Sia rename. Disciplines has its own sidebar entry.
+NOT done: PBC 03 guided walkthrough mode, PBC coverage mapping, recorded demo video. Waiting for the client's updated checklist. Not browser-verified by click: tools-tracking, attendance sync, mobilization simulate, mobile HSE screens.
+Dev server for checks: `npx vite --port 5190 --strictPort`.
+
+## 1 Nov 2026 (later): updated PBC_03.xlsx pass + demo videos
+- Branding per the sheet: OQ logo (src/app/OqLogo.tsx, sidebar/login/favicon), assistant is "Ask S!a" (was Sia).
+- Added scope Risk tab card "Impact of risk on the scope: cost and timeline" (item 1a) with Simulate risk event.
+- demo-videos/: 11 narrated mp4s in final/ (see demo-videos/README.md). Playwright recorder (lib.py, videos.py, run.py, mux.py, all.sh).
+- ElevenLabs free credits nearly used (~113 left). More narration needs a top-up.
+- Dev server was restarted: stale vite process served an old scopeMock.ts (FREEZE_DATE export error) until killed.
+
+## 5 Nov 2026: Spectrum comments (PBC 03 sheet dated 04.11.2026) - app changes done
+- SAP side by side: `src/app/SapDock.tsx` (SAP stand-in framed beside OQ, always mounted, top window only, hidden for contractors). Creating scope (manual / bulk / Excel) sends `tp.scope.created` on the bus, SAP opens orders (number = 400003 + 1000 + job no., same as `sapWoForJob`, which now returns one for every OQ-created item) and answers `sap.scope.confirmed`; OQ logs it, toasts it and opens the dock. No ack in 4 s = Failed message + warning toast. Gate 1/2 approvals push user status GT1/GT2 to SAP; bulk approval opens the dock. Dock events: `window.dispatchEvent(new CustomEvent('oq:sap-dock', {detail:{open|toggle}}))`.
+- Attendance: Automatic sync switch (workforceService `getAutoSync/setAutoSync`), runs while the page is open.
+- Re-work: equipment (Manlift, Scaffolding, Mobile crane, Welding machine, Hydrotest pump) with equipment-hours and cost in qualityMock/qualityService and `/pre-ta/rework-reports`.
+- Integration Hub: new "Interface inventory" tab (PBC item 13). Intelex / DMS / MOC are design only.
+- Old pre-PBC03 films in `../demo-video/` were sent to the Recycle Bin (owner's decision).
+- Videos: redo brief in `demo-videos/VIDEO_BRIEF.md`. NOT verified: SAP dock at widths under 1100 px, split view with the new messages.

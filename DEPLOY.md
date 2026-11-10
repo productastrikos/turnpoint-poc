@@ -1,4 +1,4 @@
-# TURNPOINT: deployment (astrikos.xyz)
+# OQ: deployment (astrikos.xyz; internal project / host name stays `turnpoint`)
 
 Follows `deployment_context.md` (two ports, two nginx files). Ports are the pair assigned to this POC (frontend 3339,
 backend 4339; same last two digits, as the convention requires). **Check the registry before deploying, then add the row `turnpoint | 3339 | 4339 | live`.**

@@ -124,7 +124,7 @@ export default function PlanCheckPage() {
       <div className="grid grid-3-2" style={{ alignItems: 'start' }}>
         <div className="stack">
           <Card>
-            <CardHeader title="Checks" action={<SimBadge kind="illustrative" title="Rules and thresholds are TURNPOINT defaults calibrated on the seeded STO-2024 and STO-2026 figures. Replace with OQ RPI's own history and cost-engineering standard." />} />
+            <CardHeader title="Checks" action={<SimBadge kind="illustrative" title="Rules and thresholds are default values calibrated on the seeded STO-2024 and STO-2026 figures. Replace with OQ RPI's own history and cost-engineering standard." />} />
             <div className="stack">
               {result.findings.map((f) => <FindingRow key={f.id} f={f} onFix={() => f.fix && patch(f.fix.patch)} />)}
             </div>
@@ -203,7 +203,7 @@ export default function PlanCheckPage() {
           <li><strong>Scope growth:</strong> a 1,350-turnaround database puts average growth after freeze at 19%, top quartile at 7% (AP-Networks, via <a href="https://cleopatraenterprise.com/blog/role-of-scope-freeze-in-turnarounds/" target="_blank" rel="noreferrer">scope freeze article</a>).</li>
           <li><strong>Estimate accuracy:</strong> turnaround estimates vary about -27% to +43% against the +/-10% teams claim (<a href="https://www.ogj.com/general-interest/article/17227163/analysis-yields-turnaround-benchmarks-for-allowance-contingency" target="_blank" rel="noreferrer">Oil &amp; Gas Journal</a>); scope freeze about 9 months before shutdown.</li>
           <li><strong>Estimate maturity:</strong> AACE 18R-97 estimate classes; the less defined the scope, the wider the range, so contingency steps down from Class 4 to Class 3 once scope is frozen.</li>
-          <li><strong>SOW 13:</strong> preparation lead time T-36 months (high complexity) and T-24 months (medium). Thresholds marked Policy are TURNPOINT defaults to be agreed with OQ RPI.</li>
+          <li><strong>SOW 13:</strong> preparation lead time T-36 months (high complexity) and T-24 months (medium). Thresholds marked Policy are defaults to be agreed with OQ RPI.</li>
         </ul>
       </Card>
     </div>

@@ -81,3 +81,60 @@ export function schedule(acts: CpmActivity[], dataDate: number): CpmResult {
   }
   return { es, ef, lf, tf, finish, driving };
 }
+
+// ---------------------------------------------------------------- criticality and path ranking
+// Used by the Critical Path Monitor: which activities are critical, which are near-critical, and how the parallel
+// chains that feed the end milestone rank against each other (CP1 = the chain that arrives last, i.e. drives the end).
+
+/** Near-critical threshold in days of total float (GAO Schedule Assessment Guide: float up to about a week of working time). */
+export const NEAR_CRITICAL_DAYS = 5;
+
+export type Criticality = 'critical' | 'near' | 'normal';
+
+/** Critical = zero or negative total float; near-critical = up to NEAR_CRITICAL_DAYS of float. */
+export function criticalityOf(totalFloat: number): Criticality {
+  const tf = Math.round(totalFloat * 1e6) / 1e6;
+  return tf <= 0 ? 'critical' : tf <= NEAR_CRITICAL_DAYS ? 'near' : 'normal';
+}
+
+/** Every activity upstream of `id` (transitive predecessors). */
+export function ancestorsOf(acts: CpmActivity[], id: string): Set<string> {
+  const byId = new Map(acts.map((a) => [a.id, a]));
+  const out = new Set<string>();
+  const walk = (x: string) => {
+    byId.get(x)?.preds.forEach((p) => {
+      if (!out.has(p.id)) {
+        out.add(p.id);
+        walk(p.id);
+      }
+    });
+  };
+  walk(id);
+  return out;
+}
+
+export interface CpmChain {
+  gate: string;
+  /** Where this chain lands on the end milestone (gate finish + the lag from the gate to the end). */
+  arrival: number;
+  gateFloat: number;
+  /** 0 = the driving (longest) chain. */
+  rank: number;
+  ancestors: Set<string>;
+}
+
+/**
+ * Rank the parallel chains that feed `endId` through the given gate milestones. Longest arrival first (that chain
+ * drives the end date); ties go to the lower float, then to the order the gates were given, so labels never flip on a tie.
+ */
+export function rankChains(acts: CpmActivity[], res: CpmResult, endId: string, gates: string[]): CpmChain[] {
+  const end = acts.find((a) => a.id === endId);
+  if (!end) return [];
+  return gates
+    .map((gate, i) => {
+      const link = end.preds.find((p) => p.id === gate);
+      return { gate, i, arrival: res.ef[gate] + (link?.lag ?? 0), gateFloat: res.tf[gate], ancestors: ancestorsOf(acts, gate) };
+    })
+    .sort((a, b) => b.arrival - a.arrival || a.gateFloat - b.gateFloat || a.i - b.i)
+    .map((c, rank) => ({ gate: c.gate, arrival: c.arrival, gateFloat: c.gateFloat, rank, ancestors: c.ancestors }));
+}

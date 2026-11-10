@@ -16,7 +16,10 @@ import { DurationExamples, DurationGuard } from './DurationGuard';
 import type { DurationAssessment } from '../../ai/durationModel';
 import type { DurationExample } from '../../services/durationService';
 import { checkCandidate, checkRows, type PairScore } from '../../services/duplicateService';
+import { formatHours, formatMoney, getScopeState } from '../../services/scopeService';
 import { SimBadge } from '../../components/ui/SimBadge';
+import { BudgetEstimateModal, BudgetEstimatePanel, omr } from './BudgetEstimator';
+import { useScope } from './useScope';
 import type { Discipline, Job } from '../../types';
 
 const LEVELS = ['1', '2', '3', '4', '5'];
@@ -52,6 +55,7 @@ function rowProblem(r: ImportRow & { problem?: string }): string | undefined {
 
 export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const { showToast } = useToast();
+  const frozen = useScope().stage === 'frozen';
   const [tab, setTab] = useState<TabId>('manual');
   const [values, setValues] = useState<FormValues>(() => initialValues(FIELDS));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -61,6 +65,10 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
   const [matches, setMatches] = useState<PairScore[]>([]);
   const [duration, setDuration] = useState<DurationAssessment | null>(null);
   const [rowChecks, setRowChecks] = useState<Record<string, PairScore | undefined>>({});
+  // import preview: rows whose missing budget was filled with the AI estimate
+  const [costFill, setCostFill] = useState<Record<string, number>>({});
+  const [estRow, setEstRow] = useState<ImportRow | null>(null);
+  const eff = (r: ImportRow & { problem?: string }) => (costFill[r.desc] ? { ...r, costOMR: costFill[r.desc], problem: r.problem === 'Cost estimate missing' ? undefined : r.problem } : r);
 
   // as-you-type duplicate check (S9): debounced, against the live worklist
   useEffect(() => {
@@ -105,6 +113,11 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
     setErrors({});
     onCreated();
     onClose();
+    const variation = getScopeState().openVarByJob[job.id];
+    if (variation) {
+      showToast(`${job.id} raised after the freeze as variation ${variation.id}: ${formatMoney(variation.costOMR)}, ${formatHours(variation.manhours)}${variation.cpDays ? `, critical path +${variation.cpDays} d` : ', no critical-path impact'}. Awaiting ${variation.approver}; approving it re-issues the certificate.`, 'warn');
+      return;
+    }
     const dup = matches.find((m) => m.kind === 'duplicate');
     if (underEstimated && duration && planned < duration.expectedHours) {
       showToast(`${job.id} created with ${planned} h, but the AI expects about ${duration.expectedHours} h. The gap is flagged in the worklist.`, 'warn');
@@ -133,11 +146,13 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
     );
     setBusy(false);
     setLoaded(null);
+    setCostFill({});
     onCreated();
     onClose();
     const invalid = rows.length - ok.length - dupRows.length;
     const dupNote = dupRows.length ? ` ${dupRows.length} skipped as duplicate${dupRows.length === 1 ? '' : 's'} of ${dupRows.map((r) => rowChecks[r.desc]!.b.id).join(', ')}.` : '';
-    showToast(`${ok.length} rows imported as scope items at Gate 1.${invalid ? ` ${invalid} rejected for missing mandatory fields.` : ''}${dupNote}`, invalid || dupRows.length ? 'warn' : 'good');
+    const aiNote = ok.filter((r) => costFill[r.desc]).length ? ` ${ok.filter((r) => costFill[r.desc]).length} carry an AI budget estimate.` : '';
+    showToast(`${ok.length} rows imported as scope items at Gate 1.${aiNote}${invalid ? ` ${invalid} rejected for missing mandatory fields.` : ''}${dupNote} They are ranked on the Scope challenge tab.`, invalid || dupRows.length ? 'warn' : 'good');
   }
 
   function applyExample(ex: DurationExample) {
@@ -157,7 +172,8 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title="New scope item" width={760}>
+      <Modal open={open} onClose={onClose} title={frozen ? 'New scope item (post-freeze variation)' : 'New scope item'} width={960}>
+        {frozen && <div className="callout callout-warn" style={{ marginBottom: 12 }}>The scope is frozen. This item is not added directly: it is raised as a <strong>variation</strong> with cost, man-hours and critical-path impact, and enters the scope only when change control approves it (certificate Rev B, C ...).</div>}
         <Tabs tabs={TABS} value={tab} onChange={(t) => { setTab(t); setLoaded(null); }} />
 
         {tab === 'manual' && (
@@ -178,6 +194,14 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
               onUseHours={(h) => setValues((p) => ({ ...p, plannedHours: String(h) }))}
               onResult={setDuration}
             />
+            <BudgetEstimatePanel
+              input={{ desc: values.desc ?? '', discipline: values.discipline ?? '', tag: values.tag, area: values.area, manhours: Number(values.manhours) || undefined, likelihood: Number(values.likelihood) || undefined, consequence: Number(values.consequence) || undefined }}
+              onAccept={(e) => {
+                setValues((p) => ({ ...p, costOMR: String(e.estimateOMR), manhours: p.manhours?.trim() ? p.manhours : String(e.manhours) }));
+                setErrors((p) => ({ ...p, costOMR: '' }));
+                showToast(`AI budget estimate accepted: ${omr(e.estimateOMR)} (range ${omr(e.lowOMR)} to ${omr(e.highOMR)}, ${e.confidence}% confidence) filled in. Simulated on-device model.`, 'accent');
+              }}
+            />
             {top && (
               <div className={`callout ${dupWarning ? 'callout-crit' : ''}`} style={{ marginTop: 14 }} role="status">
                 <div className="row-wrap" style={{ justifyContent: 'space-between' }}>
@@ -190,7 +214,7 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
             )}
             <div className="row" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
               <button className="btn" onClick={onClose}>{dupWarning ? 'Cancel, it is a duplicate' : 'Cancel'}</button>
-              <ActionButton variant={dupWarning ? 'danger' : 'primary'} small={false} busy={busy} onClick={submit}>{dupWarning ? 'Create anyway' : 'Create at Gate 1'}</ActionButton>
+              <ActionButton variant={dupWarning ? 'danger' : 'primary'} small={false} busy={busy} onClick={submit}>{dupWarning ? 'Create anyway' : frozen ? 'Raise as post-freeze variation' : 'Create at Gate 1'}</ActionButton>
             </div>
           </>
         )}
@@ -201,7 +225,7 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
               <div className="empty-state" style={{ border: '2px dashed var(--border)', borderRadius: 'var(--radius-lg)' }}>
                 <div style={{ fontSize: 30 }}>⇪</div>
                 <div style={{ fontWeight: 600, color: 'var(--ink-2)' }}>{tab === 'bulk' ? 'Drop a bulk upload file (CSV)' : 'Drop an Excel workbook (.xlsx)'}</div>
-                <div className="small" style={{ margin: '4px 0 12px' }}>The demo uses a bundled sample, not your file. Every row is validated against the mandatory fields before it can enter the worklist.</div>
+                <div className="small" style={{ margin: '4px 0 12px' }}>The demo uses a bundled sample, not your file. Every row is validated against the mandatory fields before it can enter the worklist. A missing budget can be filled with the AI estimate.</div>
                 <button className="btn btn-primary" onClick={() => setLoaded(tab)}>Use sample {tab === 'bulk' ? 'TA2026_bulk_scope.csv' : 'TA2026_Scope_Additions.xlsx'}</button>
               </div>
             )}
@@ -210,21 +234,21 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
                 <DataTable
                   dense
                   rowKey={(r: ImportRow & { problem?: string }) => r.desc}
-                  rows={sample}
+                  rows={sample.map(eff)}
                   columns={[
                     { key: 'desc', header: 'Description' },
                     { key: 'area', header: 'Area' },
                     { key: 'tag', header: 'Tag', mono: true },
                     { key: 'costOMR', header: 'Est. (OMR)', mono: true, align: 'right', render: (r) => r.costOMR.toLocaleString() },
                     { key: 'manhours', header: 'Man-hours', mono: true, align: 'right' },
-                    { key: 'v', header: 'Validation', nosort: true, render: (r) => (rowProblem(r) ? <Chip tone="crit">{rowProblem(r)}</Chip> : <Chip tone="good">Valid</Chip>) },
+                    { key: 'v', header: 'Validation', nosort: true, render: (r) => (rowProblem(r) ? <span className="row-wrap" style={{ gap: 6 }}><Chip tone="crit">{rowProblem(r)}</Chip>{rowProblem(r) === 'Cost estimate missing' && <button className="btn btn-sm" onClick={() => setEstRow(r)} data-testid="row-ai-estimate">AI estimate</button>}</span> : costFill[r.desc] ? <Chip tone="accent">Valid · AI estimate</Chip> : <Chip tone="good">Valid</Chip>) },
                     { key: 'dup', header: 'AI duplicate check', nosort: true, render: (r) => (rowProblem(r) ? <span className="small muted">not checked</span> : <DupCheckChip match={rowChecks[r.desc]} />) },
                   ]}
                 />
                 <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
                   <button className="btn" onClick={() => setLoaded(null)}>Back</button>
-                  <ActionButton variant="primary" small={false} busy={busy} onClick={() => importRows(sample, loaded === 'bulk' ? 'Bulk upload' : 'Excel import')}>
-                    Import {sample.filter((r) => !rowProblem(r) && rowChecks[r.desc]?.kind !== 'duplicate').length} valid rows
+                  <ActionButton variant="primary" small={false} busy={busy} onClick={() => importRows(sample.map(eff), loaded === 'bulk' ? 'Bulk upload' : 'Excel import')}>
+                    Import {sample.map(eff).filter((r) => !rowProblem(r) && rowChecks[r.desc]?.kind !== 'duplicate').length} valid rows
                   </ActionButton>
                 </div>
               </>
@@ -240,6 +264,17 @@ export function CreateScopeDialog({ open, onClose, onCreated }: { open: boolean;
           </div>
         )}
       </Modal>
+      <BudgetEstimateModal
+        open={Boolean(estRow)}
+        title={estRow ? `AI budget estimate: ${estRow.desc}` : 'AI budget estimate'}
+        input={estRow ? { desc: estRow.desc, discipline: estRow.discipline, tag: estRow.tag, area: estRow.area, manhours: estRow.manhours, likelihood: estRow.likelihood, consequence: estRow.consequence } : null}
+        onClose={() => setEstRow(null)}
+        onAccept={(e) => {
+          if (estRow) setCostFill((p) => ({ ...p, [estRow.desc]: e.estimateOMR }));
+          showToast(`AI budget estimate ${omr(e.estimateOMR)} applied to the row (range ${omr(e.lowOMR)} to ${omr(e.highOMR)}). It can now be imported.`, 'accent');
+          setEstRow(null);
+        }}
+      />
       <SapPullDrawer open={sapOpen} onClose={() => setSapOpen(false)} onImported={() => { onCreated(); onClose(); }} />
     </>
   );

@@ -155,7 +155,7 @@ export async function mergeFinding(f: ScopeFinding): Promise<void> {
     channel: 'OData V2 / OAuth 2.0 + mTLS',
     note: `${f.drop.id} merged into ${f.keep.id} (AI duplicate check, ${Math.round(f.probability * 100)}%)${sapRef ? ', duplicate notification closed' : ''}`,
   });
-  const note = `Duplicate of ${f.keep.id} (merged in TURNPOINT, AI duplicate check ${Math.round(f.probability * 100)}%)`;
+  const note = `Duplicate of ${f.keep.id} (merged in OQ, AI duplicate check ${Math.round(f.probability * 100)}%)`;
   if (f.drop.source === 'SAP notification' && sapRef) sendToSystems({ type: 'tp.notification.update', MaintenanceNotification: sapRef, phase: 'Completed', ref: f.keep.id, note });
   else if (sapWoForJob(f.drop)) sendToSystems({ type: 'tp.order.upsert', order: { MaintenanceOrder: sapWoForJob(f.drop)!, SystemStatusText: 'TECO', UserStatusText: 'DUPL' }, note });
 }

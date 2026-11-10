@@ -1,5 +1,6 @@
 // QA/QC: heat exchanger inspection workflow (SOW dry run 15-24) and Inspection Test Plans (P9).
-import { rng } from './_gen';
+import { rng, addDays } from './_gen';
+import { materialItems } from './materialsMock';
 
 export const STAGES = [
   { id: 'pre', name: 'Pre-cleaning' },
@@ -131,7 +132,7 @@ export const exchangers: Exchanger[] = build();
 
 // ---------------- ITP (P9) ----------------
 
-export type PointType = 'H' | 'W' | 'R'; // hold, witness, review
+export type PointType = 'H' | 'W' | 'R' | 'S'; // hold, witness, review, surveillance
 
 export interface ItpPoint {
   name: string;
@@ -181,3 +182,241 @@ export const itps: Itp[] = itpDefs.map(([materialId, po, vendor, item, done], i)
   points: POINTS.map(([name, type], k) => ({ name, type, done: k < done })),
   note: materialId === 'MTO-012' ? 'Hold point 4 (NDT witness) needs OQ inspector attendance at the vendor' : undefined,
 }));
+
+// ---------------- PO -> ITP -> acceptance pipeline (PBC 5 and 6) ----------------
+// One record per purchase order. PO numbers and vendors match the material-tracking procurement lines (mocks/procurementMock.ts);
+// the pipeline stages, owners and SLAs are defined here and used by the Workflow tab, the PO & ITP tab and the service.
+
+export const DEMO_TODAY = '2026-08-16';
+
+export type PoStageId = 'po' | 'itp-submit' | 'itp-review' | 'schedule' | 'fat' | 'receipt' | 'cert' | 'release';
+export type OwnerKind = 'proc' | 'vendor' | 'oq' | 'insp' | 'site' | 'plan';
+
+export interface PoStageDef {
+  id: PoStageId | 'ncr';
+  name: string;
+  short: string;
+  owner: string;
+  ownerKind: OwnerKind;
+  /** service level in days (0 = no clock) */
+  sla: number;
+  desc: string;
+}
+
+export const PO_STAGES: PoStageDef[] = [
+  { id: 'po', name: 'PO issued', short: 'PO issued', owner: 'OQ Procurement', ownerKind: 'proc', sla: 1, desc: 'Purchase order released from SAP MM. The ITP request goes to the vendor.' },
+  { id: 'itp-submit', name: 'Vendor submits ITP', short: 'Vendor ITP', owner: 'Vendor', ownerKind: 'vendor', sla: 5, desc: 'Vendor uploads the Inspection Test Plan (or a corrected revision) in the vendor portal.' },
+  { id: 'itp-review', name: 'OQ reviews / approves ITP', short: 'ITP review', owner: 'OQ QA/QC', ownerKind: 'oq', sla: 3, desc: 'Comments, reject and resubmit until the ITP is approved.' },
+  { id: 'schedule', name: 'Inspection points scheduled', short: 'Schedule H/W/R/S', owner: 'OQ QA/QC', ownerKind: 'oq', sla: 2, desc: 'Hold (H), Witness (W), Review (R) and Surveillance (S) points get dates.' },
+  { id: 'fat', name: 'Vendor inspection / FAT', short: 'FAT + IRN', owner: 'Inspector', ownerKind: 'insp', sla: 21, desc: 'Points released at the vendor works. The inspection release note (IRN) ends the stage.' },
+  { id: 'receipt', name: 'Receipt & site acceptance', short: 'Site receipt', owner: 'Site', ownerKind: 'site', sla: 3, desc: 'Goods received, site acceptance inspection against the PO and the IRN.' },
+  { id: 'cert', name: 'Acceptance certificate issued', short: 'Certificate', owner: 'OQ QA/QC', ownerKind: 'oq', sla: 1, desc: 'Blocked while any hold/witness point or NCR is open.' },
+  { id: 'release', name: 'Released to work pack / site', short: 'Released', owner: 'Planner', ownerKind: 'plan', sla: 0, desc: 'Material is cleared for the work pack and can be issued to the job.' },
+];
+export const NCR_STAGE: PoStageDef = { id: 'ncr', name: 'NCR / rework loop', short: 'NCR loop', owner: 'Vendor + OQ QA/QC', ownerKind: 'vendor', sla: 7, desc: 'Failed inspection: vendor reworks, OQ verifies and closes, then the PO returns to the stage that failed.' };
+
+export type ItpStatus = 'Not submitted' | 'Submitted' | 'Under review' | 'Approved' | 'Rejected';
+
+export interface PoPoint {
+  id: string;
+  name: string;
+  type: PointType;
+  where: 'Vendor works' | 'Site';
+  done: boolean;
+  doneAt?: string;
+  by?: string;
+  planned?: string;
+}
+
+export interface PoNcr {
+  id: string;
+  pointName: string;
+  text: string;
+  raisedAt: string;
+  raisedBy: string;
+  origin: 'fat' | 'receipt';
+  status: 'Open' | 'Rework submitted' | 'Closed';
+  closedAt?: string;
+  closedBy?: string;
+}
+
+export interface PoEvent {
+  at: string;
+  by: string;
+  text: string;
+}
+
+export interface ItpComment {
+  at: string;
+  by: string;
+  text: string;
+  kind: 'submitted' | 'comment' | 'approved' | 'rejected';
+}
+
+export interface PoRec {
+  id: string; // PO number (same as material tracking)
+  itpNo: string;
+  materialId: string;
+  vendor: string;
+  item: string;
+  jobId: string;
+  area: string;
+  poDate: string;
+  valueOMR: number;
+  requiredBy: string;
+  stage: PoStageId;
+  stageSince: string;
+  itpStatus: ItpStatus;
+  itpRev: string;
+  itpSubmittedAt?: string;
+  itpApprovedAt?: string;
+  itpComments: ItpComment[];
+  points: PoPoint[];
+  irnNo?: string;
+  ncrs: PoNcr[];
+  receivedOn?: string;
+  siteAcceptedOn?: string;
+  cert?: { no: string; issuedAt: string; by: string; workPack: string };
+  events: PoEvent[];
+  demo?: boolean;
+}
+
+export const POINT_TEMPLATE: { name: string; type: PointType; where: PoPoint['where'] }[] = [
+  { name: 'Material certificate review', type: 'R', where: 'Vendor works' },
+  { name: 'Raw material inspection', type: 'W', where: 'Vendor works' },
+  { name: 'In-process surveillance (fabrication)', type: 'S', where: 'Vendor works' },
+  { name: 'Dimensional and visual check', type: 'W', where: 'Vendor works' },
+  { name: 'NDT witness (RT/UT)', type: 'H', where: 'Vendor works' },
+  { name: 'Pressure / functional test', type: 'H', where: 'Vendor works' },
+  { name: 'Final inspection and release note', type: 'H', where: 'Vendor works' },
+];
+
+const INSPECTORS = ['A. Hinai', 'P. Menon', 'A. Hinai'];
+
+export function buildPoints(po: string, done: number, scheduledFrom?: string): PoPoint[] {
+  return POINT_TEMPLATE.map((t, i) => ({
+    id: `${po}-P${i + 1}`,
+    name: t.name,
+    type: t.type,
+    where: t.where,
+    done: i < done,
+    doneAt: i < done ? addDays(scheduledFrom ?? DEMO_TODAY, -(done - i) * 2) : undefined,
+    by: i < done ? INSPECTORS[i % INSPECTORS.length] : undefined,
+    planned: scheduledFrom ? (i < done ? addDays(scheduledFrom, -(done - i) * 2) : addDays(scheduledFrom, (i - done + 1) * 3)) : undefined,
+  }));
+}
+
+interface SeedDef {
+  mto: string;
+  po: string;
+  vendor: string;
+  item: string;
+  itpNo: string;
+  stage: PoStageId;
+  stageSince: string;
+  poDate: string;
+  itp: ItpStatus;
+  rev?: string;
+  submitted?: string;
+  approved?: string;
+  done?: number;
+  scheduled?: boolean;
+  received?: string;
+  siteAccepted?: string;
+  cert?: { no: string; at: string; by: string };
+  comments?: ItpComment[];
+  ncr?: { point: string; text: string; origin: 'fat' | 'receipt'; at: string };
+  overdueHold?: boolean;
+}
+
+const QA_LEAD = 'P. Menon (QA/QC lead)';
+
+const seeds: SeedDef[] = [
+  { mto: 'MTO-014', po: '4500079423', vendor: 'Siemens Energy', item: 'K-301 rotor seal kit', itpNo: 'ITP-307', stage: 'po', stageSince: '2026-08-16', poDate: '2026-08-16', itp: 'Not submitted' },
+  {
+    mto: 'MTO-006', po: '4500079655', vendor: 'Haldor Topsoe', item: 'Catalyst support grid', itpNo: 'ITP-303', stage: 'itp-submit', stageSince: '2026-08-13', poDate: '2026-07-30', itp: 'Rejected', rev: 'A', submitted: '2026-08-11',
+    comments: [
+      { at: '2026-08-11T09:30', by: 'Haldor Topsoe (vendor)', text: 'ITP Rev A submitted via vendor portal.', kind: 'submitted' },
+      { at: '2026-08-13T14:05', by: QA_LEAD, text: 'Add an NDT hold point on the grid weld seams and require EN 10204 3.2 material certificates. Resubmit as Rev B.', kind: 'rejected' },
+    ],
+  },
+  { mto: 'MTO-018', po: '4500079188', vendor: 'Emerson Process', item: 'Control valve trim sets (32)', itpNo: 'ITP-308', stage: 'itp-review', stageSince: '2026-08-11', poDate: '2026-07-28', itp: 'Under review', rev: 'A', submitted: '2026-08-11', comments: [{ at: '2026-08-11T10:10', by: 'Emerson Process (vendor)', text: 'ITP Rev A submitted via vendor portal.', kind: 'submitted' }] },
+  { mto: 'MTO-009', po: '4500078840', vendor: 'Axens', item: 'Hydrocracking catalyst charge (HC-24)', itpNo: 'ITP-304', stage: 'schedule', stageSince: '2026-08-15', poDate: '2026-07-20', itp: 'Approved', rev: 'A', submitted: '2026-08-12', approved: '2026-08-15' },
+  { mto: 'MTO-002', po: '4500079301', vendor: 'Sulzer Chemtech', item: 'Reactor internals tray set, R-101', itpNo: 'ITP-301', stage: 'fat', stageSince: '2026-08-06', poDate: '2026-07-10', itp: 'Approved', rev: 'A', submitted: '2026-08-02', approved: '2026-08-04', done: 3, scheduled: true },
+  { mto: 'MTO-012', po: '4500079302', vendor: 'Sulzer Chemtech', item: 'T-251 structured packing', itpNo: 'ITP-306', stage: 'fat', stageSince: '2026-08-06', poDate: '2026-07-10', itp: 'Approved', rev: 'A', submitted: '2026-08-03', approved: '2026-08-06', done: 4, scheduled: true, overdueHold: true },
+  {
+    mto: 'MTO-011', po: '4500079120', vendor: 'Koch-Glitsch', item: 'T-201 valve trays, Section B', itpNo: 'ITP-305', stage: 'fat', stageSince: '2026-08-03', poDate: '2026-07-05', itp: 'Approved', rev: 'A', submitted: '2026-08-01', approved: '2026-08-03', done: 4, scheduled: true,
+    ncr: { point: 'NDT witness (RT/UT)', text: 'RT film shows lack of fusion on 3 tray support welds. Weld repair and re-shoot required before the hold point can be released.', origin: 'fat', at: '2026-08-15T11:20' },
+  },
+  { mto: 'MTO-003', po: '4500079422', vendor: 'Siemens Energy', item: 'Rotor bearing kit, C-301', itpNo: 'ITP-302', stage: 'receipt', stageSince: '2026-08-14', poDate: '2026-06-20', itp: 'Approved', rev: 'A', submitted: '2026-07-31', approved: '2026-08-01', done: 7, scheduled: true },
+  { mto: 'MTO-005', po: '4500080012', vendor: 'Emerson Process', item: 'Instrument loop transmitters (QC-2201)', itpNo: 'ITP-311', stage: 'receipt', stageSince: '2026-08-09', poDate: '2026-06-28', itp: 'Approved', rev: 'A', submitted: '2026-07-20', approved: '2026-07-22', done: 7, scheduled: true, received: '2026-08-09' },
+  { mto: 'MTO-021', po: '4500080210', vendor: 'ABB Oman', item: 'MCC-3 protection relays', itpNo: 'ITP-309', stage: 'cert', stageSince: '2026-08-15', poDate: '2026-06-15', itp: 'Approved', rev: 'A', submitted: '2026-07-05', approved: '2026-07-07', done: 7, scheduled: true, received: '2026-08-12', siteAccepted: '2026-08-15' },
+  { mto: 'MTO-022', po: '4500080188', vendor: 'John Crane', item: 'P-205 mechanical seals (API 682)', itpNo: 'ITP-310', stage: 'release', stageSince: '2026-08-14', poDate: '2026-06-12', itp: 'Approved', rev: 'A', submitted: '2026-07-01', approved: '2026-07-04', done: 7, scheduled: true, received: '2026-08-12', siteAccepted: '2026-08-13', cert: { no: 'AC-2026-0004', at: '2026-08-14T10:40', by: 'A. Hinai' } },
+  { mto: 'MTO-013', po: '4500080288', vendor: 'Axens', item: 'Claus reactor catalyst', itpNo: 'ITP-312', stage: 'release', stageSince: '2026-08-12', poDate: '2026-06-08', itp: 'Approved', rev: 'A', submitted: '2026-06-30', approved: '2026-07-02', done: 7, scheduled: true, received: '2026-08-11', siteAccepted: '2026-08-11', cert: { no: 'AC-2026-0003', at: '2026-08-12T09:15', by: 'A. Hinai' } },
+  { mto: 'MTO-001', po: '4500081120', vendor: 'Sohar Gasket Co', item: 'Spiral wound gaskets, 8" 300# (40)', itpNo: 'ITP-313', stage: 'release', stageSince: '2026-08-12', poDate: '2026-06-02', itp: 'Approved', rev: 'A', submitted: '2026-06-24', approved: '2026-06-26', done: 7, scheduled: true, received: '2026-08-12', siteAccepted: '2026-08-12', cert: { no: 'AC-2026-0002', at: '2026-08-12T15:30', by: 'P. Menon' } },
+];
+
+function seedPo(d: SeedDef): PoRec {
+  const mat = materialItems.find((m) => m.id === d.mto);
+  let points = buildPoints(d.po, d.done ?? 0, d.scheduled ? DEMO_TODAY : undefined);
+  if (d.overdueHold) points = points.map((p) => (p.type === 'H' && !p.done && p.name.startsWith('NDT') ? { ...p, planned: '2026-08-14' } : p));
+  const events: PoEvent[] = [{ at: `${d.poDate}T08:00`, by: 'OQ Procurement', text: `PO ${d.po} issued to ${d.vendor} (SAP MM)` }];
+  if (d.submitted) events.push({ at: `${d.submitted}T10:00`, by: `${d.vendor} (vendor)`, text: 'ITP Rev A submitted via vendor portal' });
+  if (d.itp === 'Rejected') events.push({ at: '2026-08-13T14:05', by: QA_LEAD, text: 'ITP Rev A rejected with comments, returned to vendor' });
+  if (d.approved) events.push({ at: `${d.approved}T11:00`, by: QA_LEAD, text: `ITP Rev ${d.rev ?? 'A'} approved` });
+  if (d.scheduled) events.push({ at: `${d.approved ?? d.stageSince}T15:00`, by: QA_LEAD, text: 'Inspection points scheduled (H/W/R/S)' });
+  if ((d.done ?? 0) > 0 && d.done !== 7) events.push({ at: `${addDays(DEMO_TODAY, -1)}T07:30`, by: 'A. Hinai', text: `${d.done} of ${points.length} inspection points released at the vendor works` });
+  if (d.done === 7) events.push({ at: `${d.stageSince}T12:00`, by: 'A. Hinai', text: `Final inspection passed, inspection release note IRN-2026-${d.po.slice(-4)} issued` });
+  if (d.received) events.push({ at: `${d.received}T09:00`, by: 'Site stores', text: 'Material received at site' });
+  if (d.siteAccepted) events.push({ at: `${d.siteAccepted}T13:00`, by: 'Site QC', text: 'Site acceptance inspection passed' });
+  const ncrs: PoNcr[] = d.ncr
+    ? [{ id: `NCR-${d.po.slice(-4)}-1`, pointName: d.ncr.point, text: d.ncr.text, raisedAt: d.ncr.at, raisedBy: 'A. Hinai', origin: d.ncr.origin, status: 'Open' }]
+    : [];
+  if (d.ncr) events.push({ at: d.ncr.at, by: 'A. Hinai', text: `NCR-${d.po.slice(-4)}-1 raised: ${d.ncr.point}` });
+  if (d.cert) events.push({ at: d.cert.at, by: d.cert.by, text: `Acceptance certificate ${d.cert.no} issued, released to work pack` });
+  events.sort((a, b) => b.at.localeCompare(a.at));
+  const comments: ItpComment[] =
+    d.comments ??
+    (d.submitted
+      ? [
+          { at: `${d.submitted}T10:00`, by: `${d.vendor} (vendor)`, text: 'ITP Rev A submitted via vendor portal.', kind: 'submitted' },
+          ...(d.approved ? [{ at: `${d.approved}T11:00`, by: QA_LEAD, text: 'Approved without comments.', kind: 'approved' as const }] : []),
+        ]
+      : []);
+  return {
+    id: d.po,
+    itpNo: d.itpNo,
+    materialId: d.mto,
+    vendor: d.vendor,
+    item: d.item,
+    jobId: mat?.jobId ?? 'J-2201',
+    area: mat?.area ?? 'Unit 100',
+    poDate: d.poDate,
+    valueOMR: mat?.estCostOMR ?? 20_000,
+    requiredBy: mat?.requiredBy ?? '2026-08-25',
+    stage: d.stage,
+    stageSince: d.stageSince,
+    itpStatus: d.itp,
+    itpRev: d.rev ?? 'A',
+    itpSubmittedAt: d.submitted,
+    itpApprovedAt: d.approved,
+    itpComments: comments,
+    points,
+    irnNo: d.done === 7 ? `IRN-2026-${d.po.slice(-4)}` : undefined,
+    ncrs,
+    receivedOn: d.received,
+    siteAcceptedOn: d.siteAccepted,
+    cert: d.cert ? { no: d.cert.no, issuedAt: d.cert.at, by: d.cert.by, workPack: `WP-${(mat?.jobId ?? 'J-2201').slice(2)}` } : undefined,
+    events,
+  };
+}
+
+export const poSeed: PoRec[] = seeds.map(seedPo);
+
+/** PR-raised material lines (no PO yet) that "Issue new PO (demo)" turns into POs, so a new PO traces back to material tracking. */
+export const DEMO_PO_POOL: { mto: string; vendor: string; item: string }[] = [
+  { mto: 'MTO-004', vendor: 'Heat Transfer Industries', item: 'E-204 tube bundle (40 tubes)' },
+  { mto: 'MTO-008', vendor: 'Emerson Process', item: 'Relief valves, flare header spare (6)' },
+  { mto: 'MTO-010', vendor: 'John Zink Hamworthy', item: 'F-101 low-NOx burners (12)' },
+  { mto: 'MTO-019', vendor: 'ABB Oman', item: 'DCS I/O cards (96)' },
+];

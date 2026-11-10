@@ -3,6 +3,8 @@
 .login-lang { position: absolute; top: 20px; inset-inline-end: 24px; }
 
 .login-card { width: 100%; max-width: 440px; box-sizing: border-box; background: #0a0a0a; border-radius: 20px; padding: 44px 40px 36px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45); display: flex; flex-direction: column; }
+.login-brand { display: flex; justify-content: center; margin-bottom: 16px; }
+.login-brand .brand-mark { width: 52px; height: 52px; border-radius: 14px; font-size: 19px; }
 .login-card h1 { margin: 0; text-align: center; font-size: 22px; font-weight: 700; color: #fff; }
 .login-sub { margin: 8px 0 0; text-align: center; font-size: 15px; color: #8fa3bf; }
 .login-card label { margin: 32px 0 8px; font-size: 13.5px; letter-spacing: 0.03em; text-transform: uppercase; color: #7fb3e6; }

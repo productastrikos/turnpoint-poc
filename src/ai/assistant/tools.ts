@@ -1,4 +1,4 @@
-// Tools the TURNPOINT assistant can call. Each one reads the same live services the screens use, so an answer is
+// Tools S!a can call. Each one reads the same live services the screens use, so an answer is
 // grounded in what the user can see (and changes when the data changes). Role-based access is enforced HERE, in code:
 // for the contractor role, cost fields are removed before anything reaches the model (SOW 4.17), not left to a prompt.
 import type Anthropic from '@anthropic-ai/sdk';
@@ -300,7 +300,7 @@ export const TOOL_IMPL = {
     return {
       page: { to: '/integrations?tab=live', label: 'Open Integration Hub' },
       data: {
-        note: 'SAP and P6 here are demo stand-in consoles exchanging messages with TURNPOINT; there is no connection to the client systems.',
+        note: 'SAP and P6 here are demo stand-in consoles exchanging messages with OQ; there is no connection to the client systems.',
         sap: seen(presence.SAP),
         p6: seen(presence.P6),
         recentMessages: hub.messages.slice(0, 8).map((m) => ({ system: m.system, direction: m.direction, object: m.object, key: m.key, status: m.status, note: m.note })),

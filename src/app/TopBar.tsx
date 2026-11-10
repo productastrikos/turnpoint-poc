@@ -22,12 +22,17 @@ export function TopBar({
   onToggleSidebar,
   chatOpen,
   onToggleChat,
+  sapOpen,
+  onToggleSap,
 }: {
   theme: Theme;
   onToggleTheme: () => void;
   onToggleSidebar: () => void;
   chatOpen: boolean;
   onToggleChat: () => void;
+  sapOpen: boolean;
+  /** Undefined when the SAP side-by-side view is not available (contractor role, or inside the split view). */
+  onToggleSap?: () => void;
 }) {
   const { persona, setPersona } = useRole();
   const { signOut } = useAuth();
@@ -105,9 +110,15 @@ export function TopBar({
         <button className="icon-btn" onClick={onToggleTheme} aria-label="Toggle theme" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
           <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
         </button>
-        <button className={`advisory-btn ${chatOpen ? 'is-on' : ''}`} onClick={onToggleChat} aria-label="Ask TURNPOINT" aria-pressed={chatOpen}>
+        {onToggleSap && (
+          <button className={`advisory-btn sap-btn ${sapOpen ? 'is-on' : ''}`} onClick={onToggleSap} aria-label="SAP side by side" aria-pressed={sapOpen} title="Show SAP S/4HANA beside this page">
+            <Icon name="link" size={16} />
+            <span>{tr('SAP side by side')}</span>
+          </button>
+        )}
+        <button className={`advisory-btn ${chatOpen ? 'is-on' : ''}`} onClick={onToggleChat} aria-label="Ask S!a" aria-pressed={chatOpen}>
           <Icon name="spark" size={16} />
-          <span>{tr('Ask TURNPOINT')}</span>
+          <span>{tr('Ask S!a')}</span>
         </button>
         <Link to="/alerts" className="icon-btn" aria-label="Alerts and notifications" title="Alerts & notifications">
           <Icon name="bell" />

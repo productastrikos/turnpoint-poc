@@ -8,7 +8,7 @@ import { TaProvider } from './app/TaContext';
 import { ToastProvider } from './app/ToastContext';
 import { AppRoutes } from './app/routes';
 
-// Stand-in consoles for the client's SAP and Primavera P6, and the split view: separate "systems", no TURNPOINT chrome.
+// Stand-in consoles for the client's SAP and Primavera P6, and the split view: separate "systems", no OQ chrome.
 const SapConsole = lazy(() => import('./ext/SapConsole'));
 const P6Console = lazy(() => import('./ext/P6Console'));
 const SplitView = lazy(() => import('./ext/SplitView'));

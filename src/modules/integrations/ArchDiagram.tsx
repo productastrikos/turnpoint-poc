@@ -1,13 +1,13 @@
 import { useChartWidth } from '../../components/charts/chartKit';
 
-/** Architecture diagram: P6 <-> TURNPOINT <-> SAP Integration Suite <-> S/4HANA. Pulse dots run along the links while a sync is running. */
+/** Architecture diagram: P6 <-> OQ <-> SAP Integration Suite <-> S/4HANA. Pulse dots run along the links while a sync is running. */
 export function ArchDiagram({ running }: { running: boolean }) {
   const [wrap, width] = useChartWidth(1000, 640);
   const GAP = 64;
   const W = (width - 3 * GAP) / 4;
   const boxes = [
     { title: 'Primavera P6', sub: 'v24.21 (UAT)', note: 'Schedule: logic, calendars, resources', color: 'var(--s4)' },
-    { title: 'TURNPOINT', sub: 'STO Platform', note: 'Field-facing single source', color: 'var(--accent)' },
+    { title: 'OQ', sub: 'STO Platform', note: 'Field-facing single source', color: 'var(--accent)' },
     { title: 'SAP Integration Suite', sub: '(CPI)', note: 'Mapping, monitoring, retry', color: 'var(--s7)' },
     { title: 'SAP S/4HANA 2025', sub: 'PM · MM · PS', note: 'Orders, materials, cost', color: 'var(--s8)' },
   ].map((b, i) => ({ ...b, x: i * (W + GAP) }));
@@ -19,7 +19,7 @@ export function ArchDiagram({ running }: { running: boolean }) {
 
   return (
     <div ref={wrap}>
-      <svg viewBox={`0 0 ${width} 136`} width="100%" height={136} role="img" aria-label="Integration architecture: Primavera P6, TURNPOINT, SAP Integration Suite, SAP S/4HANA">
+      <svg viewBox={`0 0 ${width} 136`} width="100%" height={136} role="img" aria-label="Integration architecture: Primavera P6, OQ, SAP Integration Suite, SAP S/4HANA">
         {boxes.slice(0, 3).map((b, i) => {
           const x1 = b.x + W;
           const x2 = boxes[i + 1].x;

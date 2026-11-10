@@ -165,7 +165,7 @@ const INTENTS: { id: string; words: string[]; run: Run }[] = [
   },
 ];
 
-const HELP = 'On-device mode answers questions about the critical path and what is blocking it, finish-date risk, duplicates in the scope, budget and scope growth, readiness, materials, safety and quality, the last shift handover and the SAP / P6 integration. Try one of the suggestions. (Connect the language model in .env.local for open questions.)';
+const HELP = 'S!a in on-device mode answers questions about the critical path and what is blocking it, finish-date risk, duplicates in the scope, budget and scope growth, readiness, materials, safety and quality, the last shift handover and the SAP / P6 integration. Try one of the suggestions. (Connect the language model in .env.local for open questions.)';
 
 export async function answerOffline(question: string, ctx: ToolContext): Promise<OfflineAnswer> {
   const q = question.toLowerCase();

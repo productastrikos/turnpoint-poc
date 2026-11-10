@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { StatTile } from '../../components/ui/StatTile';
@@ -11,37 +11,76 @@ import { BarChart } from '../../components/charts/BarChart';
 import { listContractorKpis } from '../../services/executionService';
 import { listNcrs } from '../../services/qualityService';
 import type { ContractorKpi } from '../../mocks/executionMock';
+import { ActionButton } from '../../components/ui/ActionButton';
+import { applyHseEntry, bumpSimulation, demoSheet, listHseDays, nextPendingContractor, resetHse, scoreAll, subscribeHse, type HseScore } from '../../services/hseService';
+import { HseSection } from './HseSection';
+import { useToast } from '../../app/ToastContext';
 
 interface Scored extends ContractorKpi {
   score: number;
   scores: Record<string, number>;
 }
 
-const AXES = ['Safety', 'Schedule', 'Quality', 'Productivity', 'Attendance', 'HSE closure'];
+const AXES = ['Safety', 'Schedule', 'Quality', 'Productivity', 'Attendance', 'HSE compliance'];
 
-function score(k: ContractorKpi, ncr: number): Scored {
+function score(k: ContractorKpi, ncr: number, hse: number): Scored {
   const scores = {
     Safety: Math.max(0, Math.round(100 - k.trif * 100)),
     Schedule: Math.min(100, Math.round(k.spi * 100)),
     Quality: Math.max(0, Math.round(k.ftr - ncr * 1.5)),
     Productivity: Math.min(100, Math.round(k.productivity * 100)),
     Attendance: Math.round(k.attendance),
-    'HSE closure': Math.round(k.hseObs),
+    'HSE compliance': Math.round(hse),
   };
-  const w = { Safety: 0.25, Schedule: 0.2, Quality: 0.2, Productivity: 0.15, Attendance: 0.1, 'HSE closure': 0.1 };
+  const w = { Safety: 0.2, Schedule: 0.2, Quality: 0.15, Productivity: 0.15, Attendance: 0.1, 'HSE compliance': 0.2 };
   const total = (Object.keys(w) as (keyof typeof w)[]).reduce((s, key) => s + scores[key] * w[key], 0);
   return { ...k, ncrOpen: ncr, score: Math.round(total), scores };
 }
 
 export default function ContractorKpiPage() {
+  const { showToast } = useToast();
   const [rows, setRows] = useState<Scored[] | null>(null);
+  const [hse, setHse] = useState<HseScore[]>([]);
+  const [delta, setDelta] = useState<Record<string, number>>({});
   const [pick, setPick] = useState('all');
+  const [busy, setBusy] = useState(false);
+  const raw = useRef<{ k: ContractorKpi[]; n: Awaited<ReturnType<typeof listNcrs>> } | null>(null);
+
+  const build = useCallback(async () => {
+    const days = await listHseDays();
+    const sc = scoreAll(days);
+    setHse(sc);
+    if (raw.current) setRows(raw.current.k.map((c) => score(c, raw.current!.n.filter((x) => x.contractor === c.contractor && x.status !== 'Closed').length, sc.find((x) => x.contractor === c.contractor)?.composite ?? c.hseObs)));
+  }, []);
 
   useEffect(() => {
-    Promise.all([listContractorKpis(), listNcrs()]).then(([k, n]) =>
-      setRows(k.map((c) => score(c, n.filter((x) => x.contractor === c.contractor && x.status !== 'Closed').length)))
-    );
-  }, []);
+    Promise.all([listContractorKpis(), listNcrs()]).then(([k, n]) => {
+      raw.current = { k, n };
+      build();
+    });
+  }, [build]);
+
+  useEffect(
+    () =>
+      subscribeHse((e) => {
+        if (e?.contractor && e.before !== undefined && e.after !== undefined) {
+          setDelta((d) => ({ ...d, [e.contractor!]: (d[e.contractor!] ?? 0) + (e.after! - e.before!) }));
+          if (e.message) showToast(e.message, 'good');
+        }
+        if (!e) setDelta({});
+        build();
+      }),
+    [build, showToast]
+  );
+
+  async function simulate() {
+    setBusy(true);
+    const { contractor } = await nextPendingContractor();
+    const sheet = demoSheet(contractor);
+    for (const p of sheet) await applyHseEntry(p, 'simulated', p.section !== 'obs');
+    bumpSimulation();
+    setBusy(false);
+  }
 
   if (!rows) return <div><PageHeader title="Contractor KPIs" subtitle="" checklist="X29" /><LoadingState /></div>;
 
@@ -91,8 +130,17 @@ export default function ContractorKpiPage() {
             { key: 'score', header: 'Score', render: (r) => <Chip tone={r.score >= 90 ? 'good' : r.score >= 82 ? 'warn' : 'crit'}>{r.score}</Chip>, sortValue: (r) => r.score },
           ]}
         />
-        <p className="small muted" style={{ margin: '10px 0 0' }}>Weights: safety 25%, schedule 20%, quality 20%, productivity 15%, attendance 10%, HSE closure 10%. Open NCRs come from the NCR register, attendance from the Attendance page.</p>
+        <p className="small muted" style={{ margin: '10px 0 0' }}>Weights: safety 20%, schedule 20%, quality 15%, productivity 15%, attendance 10%, HSE compliance 20% (toolbox talks, housekeeping, permit and PPE compliance, observation closure, entered by each contractor's supervisor in the mobile app). Open NCRs come from the NCR register, attendance from the Attendance page.</p>
       </Card>
+
+      <div className="spread no-print" style={{ margin: '22px 0 10px' }}>
+        <h3 style={{ fontSize: 18 }}>Contractor HSE compliance (entered in the mobile app)</h3>
+        <div className="row">
+          <ActionButton variant="primary" busy={busy} onClick={simulate} title="Fills today's HSE sheet for the next contractor, as if the supervisor typed it on the phone">Simulate supervisor entry</ActionButton>
+          <ActionButton onClick={() => { resetHse(); showToast('HSE entries reset to the seeded record', 'accent'); }}>Reset demo</ActionButton>
+        </div>
+      </div>
+      <HseSection scores={hse} scoreDelta={delta} />
     </div>
   );
 }

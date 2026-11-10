@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { TopBar, type Theme } from './TopBar';
 import { PhaseSpine } from './PhaseSpine';
@@ -9,6 +9,7 @@ import { AccessCtx } from './AccessContext';
 import { GROUP_LABEL } from './access';
 import { MODULE_BY_ID, moduleForPath, navEntryForModule } from './moduleRegistry';
 import { ChatPanel } from './ChatLauncher';
+import { SapDock } from './SapDock';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Card } from '../components/ui/Card';
 import { useToast } from './ToastContext';
@@ -140,7 +141,35 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [collapsed, setCollapsed] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [sapOpen, setSapOpen] = useState(false);
+  const sidebarWasCollapsed = useRef(false);
   const { showToast } = useToast();
+  // The SAP dock lives only in the top-level window (the split view frames OQ, which must not frame SAP again) and
+  // never for contractors, who must not see cost figures.
+  const canDock = typeof window !== 'undefined' && window.self === window.top && persona.kind !== 'contractor';
+
+  const openSap = useCallback(
+    (open: boolean) => {
+      if (open === sapOpen) return;
+      if (open) {
+        sidebarWasCollapsed.current = collapsed;
+        setCollapsed(true); // make room: the OQ page and SAP share the width
+        setChatOpen(false);
+      } else setCollapsed(sidebarWasCollapsed.current);
+      setSapOpen(open);
+    },
+    [collapsed, sapOpen]
+  );
+  // Other parts of the app ask for the dock by event: a SAP confirmation arrived, or the Scope page button was pressed.
+  useEffect(() => {
+    if (!canDock) return;
+    const h = (e: Event) => {
+      const d = (e as CustomEvent<{ open?: boolean; toggle?: boolean }>).detail ?? {};
+      openSap(d.toggle ? !sapOpen : (d.open ?? true));
+    };
+    window.addEventListener('oq:sap-dock', h);
+    return () => window.removeEventListener('oq:sap-dock', h);
+  }, [canDock, openSap, sapOpen]);
 
   // SAP / P6 stand-in consoles talk to this window over the local integration bus
   useEffect(() => startTurnpointLink(showToast), [showToast]);
@@ -166,7 +195,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [mod, setActivePhase]);
 
   return (
-    <div className={`app-shell ${chatOpen ? 'chat-open' : ''}`}>
+    <div className={`app-shell ${chatOpen ? 'chat-open' : ''} ${sapOpen && canDock ? 'sap-open' : ''}`}>
       <a href="#main" className="skip-link">Skip to content</a>
       <Sidebar collapsed={collapsed} />
       <div className="app-main">
@@ -175,7 +204,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           onToggleTheme={toggleTheme}
           onToggleSidebar={() => setCollapsed((c) => !c)}
           chatOpen={chatOpen}
-          onToggleChat={() => setChatOpen((o) => !o)}
+          onToggleChat={() => {
+            if (!chatOpen && sapOpen) openSap(false);
+            setChatOpen((o) => !o);
+          }}
+          sapOpen={sapOpen && canDock}
+          onToggleSap={canDock ? () => openSap(!sapOpen) : undefined}
         />
         <PhaseSpine />
         <main className="content" id="main">
@@ -195,6 +229,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
       <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+      {canDock && <SapDock open={sapOpen} onClose={() => openSap(false)} />}
     </div>
   );
 }

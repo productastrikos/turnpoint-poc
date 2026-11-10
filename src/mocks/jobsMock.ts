@@ -95,3 +95,34 @@ export const jobs: Job[] = rows.map((r) => ({
 }));
 
 export const JOB_BY_ID: Record<string, Job> = Object.fromEntries(jobs.map((j) => [j.id, j]));
+
+// ---------------------------------------------------------------- opening state of the live scope (pre-freeze)
+// `jobs` above is the scope as it stood at the freeze (the baseline). The live Scope module does not start from it:
+// before the freeze nothing is signed off, so the same items open at different gates and the demo approves them live.
+// Eight items are already fully approved, the rest wait at gate 1, 2 or 3.
+const OPENING_GATE: Record<string, 1 | 2 | 3 | 'done'> = {
+  'J-2201': 'done', 'J-2202': 'done', 'J-2203': 'done', 'J-2205': 'done', 'J-2206': 'done', 'J-2208': 'done', 'J-2209': 'done', 'J-2210': 'done',
+  'J-2211': 3, 'J-2212': 3, 'J-2213': 3, 'J-2214': 3, 'J-2215': 3,
+  'J-2216': 2, 'J-2217': 2, 'J-2218': 2, 'J-2219': 2, 'J-2220': 2, 'J-2221': 2,
+  'J-2222': 1, 'J-2223': 1, 'J-2224': 1, 'J-2225': 1,
+};
+
+/** Raised before the freeze date even if the seed row carries a later date. */
+const beforeFreeze = (iso: string) => (iso > '2026-06-08' ? `2026-06-${String(Math.max(1, Number(iso.slice(8, 10)) - 6)).padStart(2, '0')}` : iso);
+
+export function openingJobs(): Job[] {
+  const mapped = jobs.map((j): Job => {
+    const open = OPENING_GATE[j.id];
+    const base = { ...j, inBaseline: false, createdAt: beforeFreeze(j.createdAt) };
+    if (open === undefined) return base;
+    if (open === 'done') return { ...base, gate: 3, status: 'approved', approvals: approvals(3, 'approved') };
+    return { ...base, gate: open, status: 'pending', phase: 'scoping', approvals: approvals(open, 'pending') };
+  });
+  // an Excel-loaded item that arrived without a budget estimate: the AI budget estimate button fixes it
+  const noEstimate: Job = {
+    id: 'J-2237', desc: 'Re-lag steam tracing, Unit 250', discipline: 'Civil', requestedBy: 'M. Al-Balushi', costOMR: 0, gate: 1, status: 'pending', phase: 'scoping',
+    approvals: approvals(1, 'pending'), createdAt: '2026-06-03', area: 'Unit 250', tag: 'ST-250', manhours: 140, likelihood: 2, consequence: 2, source: 'Excel import',
+    taClass: 'TA', startDay: 12, durationDays: 5, inBaseline: false, contractor: DISCIPLINE_CONTRACTOR.Civil,
+  };
+  return [...mapped, noEstimate];
+}

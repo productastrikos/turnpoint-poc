@@ -1,14 +1,40 @@
-import { jobs } from '../mocks/jobsMock';
+import { openingJobs } from '../mocks/jobsMock';
 import type { Discipline, Job } from '../types';
 import { DISCIPLINE_CONTRACTOR, PEOPLE } from '../mocks/master';
 import { delay } from './_util';
-import { logMessage, pushSapStatus, sendToSystems } from './integrationService';
+import { demoStamp } from './demoClock';
+import { expectAck, logMessage, pushSapStatus, sendToSystems } from './integrationService';
 import { sapWoForJob } from '../mocks/sapKeys';
 import { unitOf } from '../mocks/master';
 import type { SapItem } from '../types/execution';
 
-let store: Job[] = [...jobs];
+// The live scope starts PRE-FREEZE (see openingJobs): eight items approved, the rest waiting at gate 1, 2 or 3.
+let store: Job[] = openingJobs();
 let seq = 0;
+/** After the scope freeze a new item is not a plain gate-1 request: it enters as a variation awaiting approval. */
+let postFreeze = false;
+
+interface JobHooks {
+  /** Called synchronously for every item created after the freeze, so the scope service can raise its variation. */
+  onCreatedPostFreeze?: (job: Job) => void;
+}
+let hooks: JobHooks = {};
+export function registerJobHooks(h: JobHooks) {
+  hooks = h;
+}
+export function setPostFreezeMode(v: boolean) {
+  postFreeze = v;
+}
+
+/** Back to the opening (pre-freeze) worklist. */
+export function resetJobs() {
+  store = openingJobs();
+  seq = 0;
+  postFreeze = false;
+}
+
+/** Synchronous read for services that already hold the data (the scope service computes readiness from it). */
+export const peekJobs = (): Job[] => store;
 
 export async function getJobs(): Promise<Job[]> {
   return delay([...store]);
@@ -58,7 +84,7 @@ function buildJob(input: NewJobInput): Job {
     status: 'pending',
     phase: 'scoping',
     approvals: freshApprovals(),
-    createdAt: new Date().toISOString().slice(0, 10),
+    createdAt: demoStamp().slice(0, 10),
     area: input.area,
     tag: input.tag,
     manhours: input.manhours,
@@ -74,18 +100,52 @@ function buildJob(input: NewJobInput): Job {
     plannedHours: input.plannedHours,
     aiDuration: input.aiDuration,
   };
+  if (postFreeze) {
+    // screened on arrival; the only thing missing is the variation approval (change control), which acts as the last gate
+    job.gate = 3;
+    job.approvals = job.approvals.map((a) => (a.gate < 3 ? { ...a, status: 'approved' as const, actedAt: demoStamp(), comment: 'Screened on raise (post-freeze)' } : a));
+  }
   store = [job, ...store];
+  if (postFreeze) hooks.onCreatedPostFreeze?.(job);
   return job;
+}
+
+/**
+ * Tell SAP about scope items just created in OQ: it opens one maintenance order per item and acknowledges the batch.
+ * Items that came from SAP already exist there, so they are left out.
+ */
+function announceToSap(created: Job[], channel: string) {
+  const mine = created.filter((j) => !j.source.startsWith('SAP'));
+  if (!mine.length) return;
+  const batch = `B${Date.now().toString(36).toUpperCase()}${mine.length}`;
+  const items = mine.map((j) => ({ ref: j.id, desc: j.desc, tag: j.tag, area: j.area, discipline: j.discipline, costOMR: j.costOMR, manhours: j.manhours, likelihood: j.likelihood, consequence: j.consequence, order: sapWoForJob(j)! }));
+  logMessage({
+    system: 'SAP',
+    direction: 'Outbound',
+    object: 'Maintenance Order',
+    key: items.length === 1 ? items[0].order : `${items.length} orders`,
+    status: 'Delivered',
+    latencyMs: 310 + items.length * 6,
+    channel: 'OData V2 (API_MAINTENANCEORDER) via SAP Integration Suite',
+    note: `${channel}: ${items.length} new scope item${items.length === 1 ? '' : 's'} sent to SAP (${items.map((i) => `${i.ref} to order ${i.order}`).slice(0, 3).join(', ')}${items.length > 3 ? ' ...' : ''}). Waiting for SAP to confirm.`,
+    request: JSON.stringify({ batch, channel, d: { results: items.slice(0, 5).map((i) => ({ MaintenanceOrder: i.order, MaintenanceOrderDesc: i.desc, Equipment: i.tag, PlannedCostOMR: i.costOMR, ZZ_TurnpointRef: i.ref })) } }, null, 2),
+  });
+  expectAck(batch, items.length, channel);
+  sendToSystems({ type: 'tp.scope.created', batch, channel, items });
 }
 
 /** Create a scope item at Gate 1. Used by the manual form. */
 export async function createJob(input: NewJobInput): Promise<Job> {
-  return delay(buildJob(input));
+  const job = buildJob(input);
+  announceToSap([job], 'Manual entry');
+  return delay(job);
 }
 
 /** Create many scope items in one round trip (bulk upload, Excel import). */
 export async function createJobs(inputs: NewJobInput[]): Promise<Job[]> {
   const jobs = inputs.map(buildJob);
+  const channel = inputs[0]?.source === 'Excel import' ? 'Excel import' : inputs[0]?.source === 'Bulk upload' ? 'Bulk upload' : 'Manual entry';
+  announceToSap(jobs, channel);
   return delay(jobs, 400);
 }
 
@@ -111,44 +171,88 @@ export async function createJobsFromSap(items: SapItem[]): Promise<Job[]> {
   return delay(created, 500);
 }
 
-export async function approveGate(jobId: string, by = 'You'): Promise<Job> {
-  store = store.map((j) => {
-    if (j.id !== jobId) return j;
-    const approvals = j.approvals.map((a) =>
-      a.gate === j.gate ? { ...a, status: 'approved' as const, approver: by, actedAt: new Date().toISOString() } : a
-    );
-    const nextGate = (j.gate < 3 ? j.gate + 1 : j.gate) as 1 | 2 | 3;
-    const fullyApproved = j.gate === 3;
-    return { ...j, approvals, gate: nextGate, status: fullyApproved ? 'approved' : 'pending' };
+function pushReleased(updated: Job) {
+  const order = sapWoForJob(updated)!;
+  pushSapStatus('Maintenance Order status', order, `${updated.id} approved at Gate 3, order released`);
+  sendToSystems({
+    type: 'tp.order.upsert',
+    order: {
+      MaintenanceOrder: order,
+      MaintenanceOrderDesc: updated.desc,
+      Equipment: updated.tag,
+      FunctionalLocation: `SOH-${unitOf(updated.area)}-${updated.tag.replace(/[^A-Z0-9]/gi, '')}`,
+      SystemStatusText: 'REL',
+      UserStatusText: 'APRV',
+      PlannedCostOMR: updated.costOMR,
+      MaintenanceNotification: updated.source === 'SAP notification' ? updated.sapRef : undefined,
+      ZZ_TurnpointRef: updated.id,
+    },
+    note: `${updated.id} approved at Gate 3 (VP Asset Ops) in OQ: order released`,
   });
-  const updated = store.find((j) => j.id === jobId)!;
-  if (updated.status === 'approved') {
-    const order = sapWoForJob(updated)!;
-    pushSapStatus('Maintenance Order status', order, `${updated.id} approved at Gate 3, order released`);
-    sendToSystems({
-      type: 'tp.order.upsert',
-      order: {
-        MaintenanceOrder: order,
-        MaintenanceOrderDesc: updated.desc,
-        Equipment: updated.tag,
-        FunctionalLocation: `SOH-${unitOf(updated.area)}-${updated.tag.replace(/[^A-Z0-9]/gi, '')}`,
-        SystemStatusText: 'REL',
-        UserStatusText: 'APRV',
-        PlannedCostOMR: updated.costOMR,
-        MaintenanceNotification: updated.source === 'SAP notification' ? updated.sapRef : undefined,
-        ZZ_TurnpointRef: updated.id,
-      },
-      note: `${updated.id} approved at Gate 3 (VP Asset Ops) in TURNPOINT: order released`,
-    });
+}
+
+/** A gate 1 or gate 2 approval in OQ moves the SAP order's user status (GT1, GT2), so SAP always shows where the item stands. */
+function pushGate(job: Job, gate: 1 | 2) {
+  const order = sapWoForJob(job);
+  if (!order) return;
+  sendToSystems({
+    type: 'tp.order.upsert',
+    order: { MaintenanceOrder: order, MaintenanceOrderDesc: job.desc, Equipment: job.tag, PlannedCostOMR: job.costOMR, UserStatusText: gate === 1 ? 'GT1' : 'GT2', ZZ_TurnpointRef: job.id },
+    note: `${job.id} cleared gate ${gate} (${GATE_ROLES[gate - 1].role}) in OQ`,
+  });
+}
+
+/** Approve the gate an item is waiting at. Synchronous core shared by the single and the bulk path. */
+function approveOne(jobId: string, by: string): Job | undefined {
+  const cur = store.find((j) => j.id === jobId);
+  if (!cur || cur.status !== 'pending') return cur;
+  const approvals = cur.approvals.map((a) => (a.gate === cur.gate ? { ...a, status: 'approved' as const, approver: by, actedAt: demoStamp() } : a));
+  const nextGate = (cur.gate < 3 ? cur.gate + 1 : cur.gate) as 1 | 2 | 3;
+  const fullyApproved = cur.gate === 3;
+  const updated: Job = { ...cur, approvals, gate: nextGate, status: fullyApproved ? 'approved' : 'pending' };
+  store = store.map((j) => (j.id === jobId ? updated : j));
+  if (updated.status === 'approved') pushReleased(updated);
+  else pushGate(updated, cur.gate as 1 | 2);
+  return updated;
+}
+
+export async function approveGate(jobId: string, by = 'You'): Promise<Job> {
+  const updated = approveOne(jobId, by);
+  return delay(updated!);
+}
+
+/** Approve the current gate of many items in one round trip ("approve all at this gate"). */
+export async function approveMany(jobIds: string[], by = 'You'): Promise<Job[]> {
+  const out = jobIds.map((id) => approveOne(id, by)).filter((j): j is Job => Boolean(j));
+  const withOrder = out.filter((j) => sapWoForJob(j));
+  if (withOrder.length > 1) {
+    logMessage({ system: 'SAP', direction: 'Outbound', object: 'Maintenance Order status', key: `${withOrder.length} orders`, status: 'Delivered', latencyMs: 380 + withOrder.length * 8, channel: 'OData V2 $batch (API_MAINTENANCEORDER) via SAP Integration Suite', note: `Bulk approval in OQ: user status updated on ${withOrder.length} SAP orders in one batch` });
+    window.dispatchEvent(new CustomEvent('oq:sap-dock', { detail: { open: true } })); // show SAP beside OQ so the updates can be seen arriving
   }
-  return delay(updated);
+  return delay(out, 350);
+}
+
+/** Final approval by change control (a post-freeze variation): every gate is signed in one decision. */
+export function approveByVariation(jobId: string, by: string, comment: string): Job | undefined {
+  const cur = store.find((j) => j.id === jobId);
+  if (!cur) return undefined;
+  const approvals = cur.approvals.map((a) => (a.status === 'approved' ? a : { ...a, status: 'approved' as const, approver: by, actedAt: demoStamp(), comment }));
+  const updated: Job = { ...cur, approvals, gate: 3, status: 'approved' };
+  store = store.map((j) => (j.id === jobId ? updated : j));
+  return updated;
+}
+
+/** Items that were approved when the scope froze are the baseline; clearing it puts the scope back to pre-freeze. */
+export function setBaseline(ids: string[] | null) {
+  const set = new Set(ids ?? []);
+  store = store.map((j) => (j.inBaseline === set.has(j.id) ? j : { ...j, inBaseline: set.has(j.id) }));
 }
 
 export async function rejectGate(jobId: string, by = 'You', comment = 'Rejected at gate review'): Promise<Job> {
   store = store.map((j) => {
     if (j.id !== jobId) return j;
     const approvals = j.approvals.map((a) =>
-      a.gate === j.gate ? { ...a, status: 'rejected' as const, approver: by, actedAt: new Date().toISOString(), comment } : a
+      a.gate === j.gate ? { ...a, status: 'rejected' as const, approver: by, actedAt: demoStamp(), comment } : a
     );
     return { ...j, approvals, status: 'rejected' as const };
   });
@@ -184,7 +288,7 @@ export async function deleteJob(jobId: string): Promise<void> {
 export async function deferJob(jobId: string, comment = 'Deferred to next turnaround'): Promise<Job> {
   store = store.map((j) => {
     if (j.id !== jobId) return j;
-    const approvals = j.approvals.map((a) => (a.gate === j.gate ? { ...a, status: 'rejected' as const, actedAt: new Date().toISOString(), comment } : a));
+    const approvals = j.approvals.map((a) => (a.gate === j.gate ? { ...a, status: 'rejected' as const, actedAt: demoStamp(), comment } : a));
     return { ...j, approvals, status: 'rejected' as const };
   });
   return delay(store.find((j) => j.id === jobId)!);
@@ -194,10 +298,15 @@ export async function deferJob(jobId: string, comment = 'Deferred to next turnar
 export async function divertToMaintenance(jobId: string): Promise<Job> {
   store = store.map((j) => {
     if (j.id !== jobId) return j;
-    const approvals = j.approvals.map((a) => (a.gate === 1 ? { ...a, status: 'rejected' as const, actedAt: new Date().toISOString(), comment: 'Diverted to routine maintenance' } : a));
+    const approvals = j.approvals.map((a) => (a.gate === 1 ? { ...a, status: 'rejected' as const, actedAt: demoStamp(), comment: 'Diverted to routine maintenance' } : a));
     return { ...j, approvals, taClass: 'Non-TA' as const, status: 'rejected' as const };
   });
   const job = store.find((j) => j.id === jobId)!;
   if (job.sapRef) logMessage({ system: 'SAP', direction: 'Outbound', object: 'Maintenance Notification', key: job.sapRef, status: 'Delivered', latencyMs: 340, channel: 'OData V2 / OAuth 2.0 + mTLS', note: 'Returned to the routine maintenance backlog (not TA-dependent)' });
   return delay(job);
+}
+
+/** Divert many Non-TA items at once (gate 1 bulk approve). */
+export async function divertMany(jobIds: string[]): Promise<void> {
+  for (const id of jobIds) await divertToMaintenance(id);
 }

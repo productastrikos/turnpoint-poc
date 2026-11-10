@@ -1,5 +1,5 @@
 // Logistic regression trained in the browser (standardised features, L2, full-batch gradient descent).
-// Small on purpose: the models in TURNPOINT have about ten features and a few thousand rows, so training takes
+// Small on purpose: the models in OQ have about ten features and a few thousand rows, so training takes
 // milliseconds, the weights can be shown on screen, and every prediction can be explained feature by feature.
 
 export interface LogRegModel {

@@ -8,7 +8,7 @@ export type SectionId = 'general' | 'initiation' | 'scoping' | 'planning' | 'pre
 export const SECTIONS: { id: SectionId; title: string; phase?: Phase }[] = [
   { id: 'general', title: 'Platform & General' },
   { id: 'initiation', title: 'TA Event Initiation', phase: 'initiation' },
-  { id: 'scoping', title: 'Scoping & Worklist Frozen', phase: 'scoping' },
+  { id: 'scoping', title: 'Scoping & Worklist', phase: 'scoping' },
   { id: 'planning', title: 'Planning, Procurement & Contracting', phase: 'planning' },
   { id: 'preta', title: 'Pre-TA', phase: 'preTa' },
   { id: 'execution', title: 'Execution', phase: 'execution' },
@@ -47,7 +47,7 @@ export const MODULES = [
   { id: 'kpis', path: '/kpis', label: 'KPIs & S-Curve', section: 'general', phases: ['execution', 'closeout'], group: 'field', keywords: 'performance scorecard spi cpi trif s-curve' },
   { id: 'readiness', path: '/readiness', label: 'Overall STO Readiness', section: 'general', phases: ['planning', 'preTa', 'execution'], group: 'field', keywords: 'readiness score gaps' },
   { id: 'budget', path: '/budget', label: 'Budget Control', section: 'general', phases: ['planning', 'preTa', 'execution', 'closeout'], group: 'commercial', keywords: 'cost wbs forecast variance' },
-  { id: 'ai-panel', path: '/ai-panel', label: 'AI Assistant & Analytics', section: 'general', phases: ['execution', 'preTa'], group: 'field', keywords: 'chatbot risk prediction forecast predictive' },
+  { id: 'ai-panel', path: '/ai-panel', label: 'S!a & AI Analytics', section: 'general', phases: ['execution', 'preTa'], group: 'field', keywords: 'sia chatbot risk prediction forecast predictive' },
   { id: 'mobile-capture', path: '/mobile-capture', label: 'Mobile Field App (Offline)', section: 'general', phases: ['preTa', 'execution'], group: 'field', keywords: 'offline sim sync photo gps barcode' },
   { id: 'integrations', path: '/integrations', label: 'Integration Hub (SAP · P6)', section: 'general', phases: ALL, group: 'admin', keywords: 'sap s/4hana primavera p6 xer odata sync' },
   { id: 'platform', path: '/platform', label: 'Platform & Performance', section: 'general', phases: ['initiation'], group: 'admin', keywords: 'roadmap implementation plan load test users response' },
@@ -61,7 +61,7 @@ export const MODULES = [
   { id: 'milestones', path: '/milestones', label: 'Milestones & Event Tracker', section: 'initiation', phases: ['initiation', 'execution'], group: 'field', keywords: 'ta milestones events issues tracker' },
   { id: 'strategy', path: '/strategy', label: 'TA Strategy Document', section: 'initiation', phases: ['initiation'], group: 'strategic', keywords: 'strategy document' },
 
-  // ---------------- Scoping & Worklist Frozen ----------------
+  // ---------------- Scoping & Worklist ----------------
   { id: 'scope', path: '/scope', label: 'Scope & Worklist', section: 'scoping', phases: ['scoping', 'planning', 'execution'], group: 'governance', keywords: 'three gate approval freeze certificate duplicate variation challenge priority mandatory' },
 
   // ---------------- Planning, Procurement & Contracting ----------------
@@ -82,6 +82,8 @@ export const MODULES = [
   { id: 'pre-ta-weld', path: '/pre-ta/weld', label: 'Weld Management', section: 'preta', phases: ['preTa', 'execution'], group: 'field', keywords: 'weld ndt joints' },
   { id: 'pre-ta-rigging', path: '/pre-ta/rigging', label: 'Rigging & Lift Management', section: 'preta', phases: ['preTa', 'execution'], group: 'field', keywords: 'lift crane rigging' },
   { id: 'pre-ta-tools', path: '/pre-ta/tools', label: 'Tools Management', section: 'preta', phases: ['preTa', 'execution'], group: 'field', keywords: 'tools' },
+  { id: 'tools-tracking', path: '/tools-tracking', label: 'Broken & Missing Tools', section: 'preta', phases: ['preTa', 'execution'], group: 'field', keywords: 'tools broken missing faulty replacement request operator mobile' },
+  { id: 'pre-ta-rework', path: '/pre-ta/rework-reports', label: 'Re-work Reports', section: 'preta', phases: ['preTa', 'execution', 'closeout'], group: 'field', keywords: 'rework dashboard report pre-ta' },
   { id: 'pre-ta-bagging', path: '/pre-ta/bagging-tagging', label: 'Bagging & Tagging', section: 'preta', phases: ['preTa'], group: 'field', keywords: 'bagging tagging' },
   { id: 'pre-ta-heavy', path: '/pre-ta/heavy-equipment', label: 'Heavy Equipment', section: 'preta', phases: ['preTa', 'execution'], group: 'field', keywords: 'crane forklift heavy equipment' },
   { id: 'pre-ta-prefab', path: '/pre-ta/prefab', label: 'Fabrication & Pre-fab', section: 'preta', phases: ['planning', 'preTa'], group: 'field', keywords: 'fabricated spool prefab' },
@@ -149,8 +151,9 @@ export const NAV: readonly NavEntry[] = [
   { id: 'n-scope', label: 'Scope & Worklist', section: 'scoping', icon: 'list', members: ['scope'] },
   { id: 'n-procurement', label: 'Materials & Procurement', section: 'planning', icon: 'box', members: ['materials', 'bom', 'material-tracking', 'pid-analyzer'] },
   { id: 'n-workpacks', label: 'Work Packs & QA/QC', section: 'planning', icon: 'check', members: ['work-packs', 'qaqc', 'flange-tracking'] },
-  { id: 'n-lookahead', label: 'Planning & Resources', section: 'preta', icon: 'calendar', members: ['lookahead', 'mobilization', 'disciplines'] },
-  { id: 'n-preta', label: 'Pre-TA Trackers', section: 'preta', icon: 'wrench', members: ['pre-ta-scaffold', 'pre-ta-isolation', 'pre-ta-insulation', 'pre-ta-weld', 'pre-ta-rigging', 'pre-ta-tools', 'pre-ta-bagging', 'pre-ta-heavy', 'pre-ta-prefab', 'pre-ta-waste', 'pre-ta-inspection'] },
+  { id: 'n-lookahead', label: 'Planning & Resources', section: 'preta', icon: 'calendar', members: ['lookahead', 'mobilization', 'pre-ta-rework'] },
+  { id: 'n-disciplines', label: 'Discipline Dashboards', section: 'preta', icon: 'org', members: ['disciplines'] },
+  { id: 'n-preta', label: 'Pre-TA Trackers', section: 'preta', icon: 'wrench', members: ['pre-ta-scaffold', 'pre-ta-isolation', 'pre-ta-insulation', 'pre-ta-weld', 'pre-ta-rigging', 'pre-ta-tools', 'tools-tracking', 'pre-ta-bagging', 'pre-ta-heavy', 'pre-ta-prefab', 'pre-ta-waste', 'pre-ta-inspection'] },
   { id: 'n-schedule', label: 'Critical Path & Schedule', section: 'execution', icon: 'route', members: ['critical-path', 'what-if', 'productivity'] },
   { id: 'n-change', label: 'Change Control', section: 'execution', icon: 'swap', members: ['scf', 'discovery-jobs', 'change-moc'] },
   { id: 'n-quality', label: 'Issues & Quality', section: 'execution', icon: 'alert', members: ['issues', 'ncr', 'rework', 'field-checklists'] },

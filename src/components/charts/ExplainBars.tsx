@@ -1,6 +1,6 @@
 /**
  * Diverging bars for a model explanation: each signal's push on the log-odds, left (lowers the probability) or
- * right (raises it). Exact for the linear models used in TURNPOINT, so "why 91 %?" has an honest answer.
+ * right (raises it). Exact for the linear models used in OQ, so "why 91 %?" has an honest answer.
  */
 export function ExplainBars({ items, labels = ['lowers the probability', 'raises the probability'], labelWidth = 220 }: { items: { label: string; contrib: number }[]; labels?: [string, string]; labelWidth?: number }) {
   const max = Math.max(...items.map((c) => Math.abs(c.contrib)), 0.5);

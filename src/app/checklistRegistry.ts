@@ -61,7 +61,7 @@ export const CHECKLIST: ChecklistItem[] = [
   it('G10', G, 10, 'Budget: planned / committed / actual / forecast per Sub-WBS, base vs current estimate, variable vs fixed, approved extras included', 'built', 'budget', 'bridge'),
   it('G11', G, 11, 'Overall STO readiness, not limited to scoping, planning and scheduling', 'built', 'readiness'),
   it('G12', G, 12, 'AI risk prediction', 'built', 'ai-panel', 'risk', 'Trained slip model + 2,000-run schedule simulation on live data; training history is generated'),
-  it('G13', G, 13, 'AI chatbot capability', 'built', 'ai-panel', 'assistant', 'Claude with tools over live data when a key is set, otherwise an on-device engine; available from every page'),
+  it('G13', G, 13, 'AI chatbot capability (S!a)', 'built', 'ai-panel', 'assistant', 'Claude with tools over live data when a key is set, otherwise an on-device engine; available from every page'),
   it('G14', G, 14, 'User friendly', 'built', 'dashboard', undefined, 'Global search (press /), consistent filters, empty and loading states, 1280x720 layout'),
 
   // ---------- TA Event Initiation ----------

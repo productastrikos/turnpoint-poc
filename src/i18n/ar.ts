@@ -24,6 +24,7 @@ export const AR: Record<string, string> = {
   'Platform & General': 'المنصة والعام',
   'TA Event Initiation': 'بدء حدث الصيانة الشاملة',
   'Scoping & Worklist Frozen': 'تحديد النطاق وتجميد قائمة الأعمال',
+  'Scoping & Worklist': 'تحديد النطاق وقائمة الأعمال',
   'Planning, Procurement & Contracting': 'التخطيط والمشتريات والتعاقد',
   'Pre-TA': 'ما قبل الصيانة الشاملة',
   Execution: 'التنفيذ',
@@ -121,7 +122,8 @@ export const AR: Record<string, string> = {
   // top bar
   'Active TA': 'الصيانة النشطة',
   'View as': 'العرض بصفة',
-  'Ask TURNPOINT': 'اسأل TURNPOINT',
+  'Ask S!a': 'اسأل S!a',
+  'S!a': 'S!a',
   'Guided demo': 'عرض إرشادي',
   'Exit demo': 'إنهاء العرض',
   'Search  ( / )': 'بحث  ( / )',

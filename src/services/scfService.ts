@@ -44,7 +44,7 @@ export async function updateSCFStatus(id: string, status: SCF['status']): Promis
     sendToSystems({
       type: 'tp.order.upsert',
       order: { MaintenanceOrder: `40000${34000 + Number(id.replace(/\D/g, ''))}`, MaintenanceOrderDesc: `${scf.id} ${scf.title}`, MaintenanceOrderType: 'PM01', SystemStatusText: 'REL', UserStatusText: 'SCFA', PlannedCostOMR: Math.round(scf.costUSD * OMR_PER_USD), ZZ_TurnpointRef: scf.id },
-      note: `${scf.id} approved by the ${scf.approver} in TURNPOINT: additional work order created`,
+      note: `${scf.id} approved by the ${scf.approver} in OQ: additional work order created`,
     });
   }
   return delay(scf);

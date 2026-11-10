@@ -122,7 +122,7 @@ export function AssistantChat({
           send(draft);
         }}
       >
-        <input type="text" placeholder="Ask a question…" value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Ask the assistant" />
+        <input type="text" placeholder="Ask S!a about scope, schedule, cost..." value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Ask S!a" />
         {busy ? (
           <button className="btn" type="button" onClick={stop}>
             Stop

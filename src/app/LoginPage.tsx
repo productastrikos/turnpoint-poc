@@ -1,3 +1,4 @@
+import { OqLogo } from './OqLogo';
 import { useState, type FormEvent } from 'react';
 import { useAuth } from './AuthContext';
 import { DEFAULT_USERNAME, DEMO_PASSWORD } from './auth';
@@ -25,6 +26,7 @@ export function LoginPage() {
     <div className="login">
       <LangToggle className="login-lang" />
       <form className="login-card" onSubmit={submit} noValidate>
+        <div className="login-brand" aria-hidden><OqLogo size={52} word /></div>
         <h1>{t('Turnaround Management')}</h1>
         <p className="login-sub">{t('Sign in to access your dashboard')}</p>
 

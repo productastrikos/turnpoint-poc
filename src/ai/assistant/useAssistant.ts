@@ -1,4 +1,4 @@
-// Conversation state for the assistant, shared by the header chat panel and AI > Assistant.
+// Conversation state for the assistant, shared by the header chat panel and AI Analytics > S!a.
 // Uses Claude (agent.ts) when the relay has an API key, otherwise the on-device engine (offline.ts).
 // The conversation resets when the viewer's role changes, so a contractor never inherits staff answers.
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -46,7 +46,7 @@ export const PROMPTS = [
 ];
 
 export const WELCOME =
-  'Hi, I am the TURNPOINT assistant. Ask about the critical path, finish-date risk, scope and duplicates, budget, readiness, materials, safety or the SAP / P6 links. I read the same data as the screens.';
+  'Hi, I am S!a, your turnaround assistant. Ask about the critical path, finish-date risk, scope and duplicates, budget, readiness, materials, safety or the SAP / P6 links. I read the same data as the screens.';
 
 export function useAssistant() {
   const { role, persona } = useRole();

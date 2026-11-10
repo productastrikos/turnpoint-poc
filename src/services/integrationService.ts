@@ -14,6 +14,30 @@ export function sendToSystems(msg: BusMessage) {
   publish('TURNPOINT', msg);
 }
 
+// ---------------------------------------------------------------- acknowledgements from SAP
+// OQ sends new scope items to SAP and expects an acknowledgement (sap.scope.confirmed). If none arrives the user is told
+// instead of being shown a success that did not happen.
+interface PendingAck { count: number; channel: string; timer: ReturnType<typeof setTimeout> }
+const pendingAcks = new Map<string, PendingAck>();
+let onNoAck: ((batch: string, count: number, channel: string) => void) | null = null;
+export function setNoAckHandler(fn: typeof onNoAck) {
+  onNoAck = fn;
+}
+export function expectAck(batch: string, count: number, channel: string, waitMs = 4000) {
+  const timer = setTimeout(() => {
+    if (pendingAcks.delete(batch)) onNoAck?.(batch, count, channel);
+  }, waitMs);
+  pendingAcks.set(batch, { count, channel, timer });
+}
+/** True the first time a batch is acknowledged (a second console answering the same batch is ignored). */
+export function takeAck(batch: string): { count: number; channel: string } | null {
+  const p = pendingAcks.get(batch);
+  if (!p) return null;
+  clearTimeout(p.timer);
+  pendingAcks.delete(batch);
+  return { count: p.count, channel: p.channel };
+}
+
 // ---------------------------------------------------------------- stand-in consoles seen on the bus
 
 const presence: Partial<Record<SystemId, number>> = {};

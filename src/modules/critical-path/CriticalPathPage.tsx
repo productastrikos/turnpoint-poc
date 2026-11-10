@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Chip } from '../../components/ui/Chip';
@@ -6,39 +6,38 @@ import { StatTile } from '../../components/ui/StatTile';
 import { Tabs, useTabParam } from '../../components/ui/Tabs';
 import { FilterChips } from '../../components/ui/FilterChips';
 import { DataTable, type Column } from '../../components/ui/DataTable';
-import { ProgressBar } from '../../components/ui/ProgressBar';
-import { BarChart } from '../../components/charts/BarChart';
 import { NetworkGraph, type NetNode } from '../../components/charts/NetworkGraph';
-import { ActionButton } from '../../components/ui/ActionButton';
 import { LoadingState } from '../../components/ui/EmptyState';
 import { TABS } from '../../app/tabRegistry';
-import { getCpDailyChanges, getCriticalPathActivities, getNearCritical, setActivityStatus, tickMonitor, type CpDay, type NearCritical } from '../../services/criticalPathService';
+import { CHAIN_NAMES, getCpDailyChanges, getCpSnapshot, getDelayEvents, type CpDay, type LiveRow, type Snapshot } from '../../services/criticalPathService';
 import { useDataEvent } from '../../app/dataEvents';
 import { scheduleActivities } from '../../mocks/scheduleMock';
-import type { CPStatus, CriticalPathActivity, Tone } from '../../types';
-import { useToast } from '../../app/ToastContext';
-import { longDate, shortDate } from '../../mocks/_gen';
-import { useCanEdit } from '../../app/AccessContext';
+import type { Tone } from '../../types';
+import { dayToDate, longDate, shortDate } from '../../mocks/_gen';
+import { useRole } from '../../app/RoleContext';
 import { IdChips } from '../_shared/IdChips';
+import { STANDING_COST_NOTE } from './costNote';
+import { LiveMonitor } from './LiveMonitor';
+import { ChangeReport } from './ChangeReport';
 
-const PATHS: CriticalPathActivity['path'][] = ['CP1', 'CP2', 'CP3'];
-const toneFor = (s: CPStatus): Tone => (s === 'on-track' ? 'good' : s === 'at-risk' ? 'warn' : 'crit');
-const META = Object.fromEntries(scheduleActivities.filter((a) => a.cp).map((a) => [a.id, a]));
-const STANDING_COST_PER_DAY = 102_800; // fixed logistics burn (WBS-8xxx) / 32 days
+const META = Object.fromEntries(scheduleActivities.map((a) => [a.id, a]));
+const critTone = (r: LiveRow): Tone => (r.crit === 'critical' ? 'crit' : r.crit === 'near' ? 'warn' : 'good');
+const statusTone = (s: LiveRow['status']): Tone => (s === 'on-track' ? 'good' : s === 'at-risk' ? 'warn' : 'crit');
+const d1 = (n: number) => `${n > 0 ? '+' : ''}${Math.round(n * 10) / 10} d`;
 
 export default function CriticalPathPage() {
-  const canEdit = useCanEdit();
-  const { showToast } = useToast();
+  const { role } = useRole();
+  const showCost = role !== 'contractor';
   const [tab, setTab] = useTabParam(TABS['critical-path'], 'activities');
-  const [activities, setActivities] = useState<CriticalPathActivity[]>([]);
+  const [snap, setSnap] = useState<Snapshot | null>(null);
   const [days, setDays] = useState<CpDay[]>([]);
+  const [changed, setChanged] = useState<string[]>([]);
   const [pathFilter, setPathFilter] = useState('all');
-  const [loadingId, setLoadingId] = useState<string | null>(null);
   const [activeNode, setActiveNode] = useState<string | null>('CPA-003');
 
   const reload = useCallback(async () => {
-    const [a, d] = await Promise.all([getCriticalPathActivities(), getCpDailyChanges()]);
-    setActivities(a);
+    const [s, d] = await Promise.all([getCpSnapshot(), getCpDailyChanges()]);
+    setSnap(s);
     setDays(d);
   }, []);
   useEffect(() => {
@@ -46,48 +45,39 @@ export default function CriticalPathPage() {
   }, [reload]);
   useDataEvent('schedule', reload); // dates and float written back from a P6 reschedule
 
+  if (!snap) return <div><PageHeader title="Critical Path Monitor" subtitle="" checklist="X3 · X21 · X30" /><LoadingState /></div>;
+
   const totalChanges = days.reduce((s, d) => s + d.changes, 0);
   const today = days[days.length - 1]?.changes ?? 0;
-  const visible = pathFilter === 'all' ? activities : activities.filter((a) => a.path === pathFilter);
+  const slip = snap.slipDays;
+  const visible = pathFilter === 'all' ? snap.rows : snap.rows.filter((r) => (pathFilter === 'Near' ? r.path === 'Near' : r.path === pathFilter));
+  const events = getDelayEvents();
 
-  async function cycleStatus(a: CriticalPathActivity) {
-    const order: CPStatus[] = ['on-track', 'at-risk', 'delayed'];
-    const next = order[(order.indexOf(a.status) + 1) % order.length];
-    setLoadingId(a.id);
-    const updated = await setActivityStatus(a.id, next);
-    await reload();
-    setLoadingId(null);
-    showToast(`${a.id} set to ${next}. Critical path change logged (${updated.changeCount}× on this activity).`, next === 'on-track' ? 'good' : next === 'at-risk' ? 'warn' : 'crit');
-  }
-
-  const columns: Column<CriticalPathActivity>[] = [
+  const columns: Column<LiveRow>[] = [
     { key: 'id', header: 'ID', mono: true },
-    { key: 'name', header: 'Activity', render: (a) => <div>{a.name}<div><IdChips p6Id={META[a.id]?.p6Id} sapWo={META[a.id]?.sapWo} /></div></div> },
-    { key: 'path', header: 'Path', render: (a) => <Chip tone="accent">{a.path}</Chip> },
-    { key: 'owner', header: 'Owner' },
-    { key: 'plannedFinish', header: 'Planned finish', mono: true, render: (a) => shortDate(a.plannedFinish) },
-    { key: 'forecastFinish', header: 'Forecast', mono: true, render: (a) => <span style={{ color: a.forecastFinish > a.plannedFinish ? 'var(--crit)' : 'var(--ink)' }}>{shortDate(a.forecastFinish)}</span> },
-    { key: 'floatDays', header: 'Float', mono: true, align: 'right', render: (a) => <span style={{ color: a.floatDays < 0 ? 'var(--crit)' : undefined }}>{a.floatDays} d</span> },
-    { key: 'changeCount', header: 'Changed', mono: true, align: 'right', render: (a) => `${a.changeCount}×` },
-    {
-      key: 'status',
-      header: 'Status (click to update)',
-      render: (a) => (
-        <button className={`chip chip-${toneFor(a.status)}`} style={{ cursor: 'pointer', border: 'none' }} disabled={loadingId === a.id || !canEdit} title={!canEdit ? 'Your role has view-only access to this page' : 'Click to change the status'} onClick={() => cycleStatus(a)}>
-          {loadingId === a.id ? 'updating…' : a.status}
-        </button>
-      ),
-      sortValue: (a) => a.status,
-    },
+    { key: 'name', header: 'Activity', render: (a) => <div>{a.name}<div><IdChips p6Id={a.p6Id} sapWo={META[a.id]?.sapWo} /></div></div> },
+    { key: 'path', header: 'Path', render: (a) => <div><Chip tone={a.path === 'Near' ? 'neutral' : 'accent'}>{a.path === 'Near' ? 'near-critical' : a.path}</Chip><div className="small muted">{a.path === 'Near' ? a.owner : a.chain}</div></div>, sortValue: (a) => a.path },
+    { key: 'owner', header: 'Owner', render: (a) => <span className="small">{a.owner}</span> },
+    { key: 'planFinish', header: 'Plan finish', mono: true, render: (a) => shortDate(dayToDate(Math.round(a.planFinish))), sortValue: (a) => a.planFinish },
+    { key: 'finish', header: 'Forecast', mono: true, render: (a) => <span style={{ color: a.shiftDays > 0.01 ? 'var(--crit)' : 'var(--ink)' }}>{shortDate(dayToDate(Math.round(a.finish)))}{a.shiftDays > 0.01 ? ` (${d1(a.shiftDays)})` : ''}</span>, sortValue: (a) => a.finish },
+    { key: 'floatDays', header: 'Float', mono: true, align: 'right', render: (a) => <span style={{ color: a.floatDays < 0 ? 'var(--crit)' : undefined }}>{Math.round(a.floatDays)} d</span>, sortValue: (a) => a.floatDays },
+    { key: 'crit', header: 'Criticality', render: (a) => <Chip tone={critTone(a)}>{a.crit === 'critical' ? (a.floatDays < 0 ? 'critical, behind' : 'critical') : a.crit === 'near' ? 'near-critical' : 'normal'}</Chip>, sortValue: (a) => a.floatDays },
+    { key: 'status', header: 'Execution status', render: (a) => <Chip tone={statusTone(a.status)}>{a.status === 'delayed' ? `delayed ${a.ownDelay} d` : a.status === 'at-risk' ? 'at risk (knock-on)' : 'on track'}</Chip>, sortValue: (a) => a.status },
+    { key: 'changeCount', header: 'Changed', mono: true, align: 'right', render: (a) => `${a.changeCount}×`, sortValue: (a) => a.changeCount },
   ];
 
   return (
     <div>
       <PageHeader
         title="Critical Path Monitor"
-        subtitle="CP1, CP2 and CP3 with dependencies, float, resources and cost, a live view of newly critical activities, and a running count of how many times the critical path has changed."
+        subtitle="CP1, CP2 and CP3 are computed from the schedule logic, not labelled by hand: activities with zero or negative float are critical, up to 5 days of float are near-critical. Add a delay to any line and see what becomes critical, how far the TA end moves and what it costs."
         checklist="X3 · X21 · X30"
-        action={days.length > 0 ? <Chip tone={today > 2 ? 'crit' : 'warn'}>{totalChanges} CP changes this TA · {today} today</Chip> : undefined}
+        action={
+          <div className="row-wrap">
+            <Chip tone={slip > 0.01 ? 'crit' : 'good'}>TA end {shortDate(snap.endDate)} ({slip > 0.01 ? d1(slip) : 'on plan'})</Chip>
+            <Chip tone={today > 2 ? 'crit' : 'warn'}>{totalChanges} CP changes this TA · {today} today</Chip>
+          </div>
+        }
       />
       <Tabs
         value={tab}
@@ -95,255 +85,128 @@ export default function CriticalPathPage() {
         tabs={[
           { id: 'activities', label: 'Activities' },
           { id: 'network', label: 'Dependency network & insights' },
-          { id: 'monitor', label: 'Live monitor' },
+          { id: 'monitor', label: 'Live monitor & delay impact' },
           { id: 'changes', label: 'CP change report', badge: totalChanges },
         ]}
       />
 
       {tab === 'activities' && (
-        <Card>
-          <div className="toolbar">
-            <FilterChips options={PATHS.map((p) => ({ value: p, count: activities.filter((a) => a.path === p).length }))} value={pathFilter} onChange={setPathFilter} allLabel="All paths" />
-            <span className="small muted" style={{ marginLeft: 'auto' }}>Changing a status counts as a critical path change and appears in the change report.</span>
+        <div className="stack" style={{ gap: 16 }}>
+          <div className="grid grid-4">
+            {snap.chains.map((c) => (
+              <div key={c.gate} className="card card-pad" style={{ borderTop: `4px solid ${c.label === 'CP1' ? 'var(--crit)' : c.label === 'CP2' ? 'var(--warn)' : 'var(--accent)'}` }}>
+                <span className="eyebrow">{c.label}{c.label === 'CP1' ? ' · drives the TA end' : ''}</span>
+                <div style={{ fontWeight: 600, margin: '4px 0' }}>{CHAIN_NAMES[c.gate]}</div>
+                <div className="small muted">arrives {shortDate(dayToDate(Math.round(c.arrival)))} · float {Math.round(c.floatDays)} d</div>
+              </div>
+            ))}
+            <div className="card card-pad">
+              <span className="eyebrow">How it is computed</span>
+              <div className="small" style={{ margin: '4px 0' }}>Forward and backward pass over the P6 logic. Critical = float ≤ 0, near-critical = float 1 to 5 d. Negative float means the activity is already behind a contractual date.</div>
+            </div>
           </div>
-          <DataTable columns={columns} rows={visible} rowKey={(a) => a.id} dense pageSize={16} />
-        </Card>
+          <Card>
+            <div className="toolbar">
+              <FilterChips options={[{ value: 'CP1', count: snap.rows.filter((r) => r.path === 'CP1').length }, { value: 'CP2', count: snap.rows.filter((r) => r.path === 'CP2').length }, { value: 'CP3', count: snap.rows.filter((r) => r.path === 'CP3').length }, { value: 'Near', label: 'Near-critical work', count: snap.rows.filter((r) => r.path === 'Near').length }]} value={pathFilter} onChange={setPathFilter} allLabel="All paths" />
+              <span className="small muted" style={{ marginLeft: 'auto' }}>Status and float update from the live monitor and from P6 reschedules.</span>
+            </div>
+            <DataTable columns={columns} rows={visible} rowKey={(a) => a.id} dense pageSize={22} />
+          </Card>
+        </div>
       )}
 
-      {tab === 'network' && <NetworkTab activities={activities} active={activeNode} setActive={setActiveNode} />}
-      {tab === 'monitor' && <MonitorTab onChange={reload} />}
-      {tab === 'changes' && <ChangesTab days={days} total={totalChanges} activities={activities} />}
+      {tab === 'network' && <NetworkBody snap={snap} active={activeNode} setActive={setActiveNode} changed={changed} showCost={showCost} />}
+      {tab === 'monitor' && <LiveMonitor snap={snap} events={events} showCost={showCost} onChange={(ids) => { setChanged(ids); reload(); }} />}
+      {tab === 'changes' && <ChangeReport days={days} events={events} snap={snap} showCost={showCost} />}
     </div>
   );
 }
 
 // ------------------------------------------------------------------ network + insights
 
-function NetworkTab({ activities, active, setActive }: { activities: CriticalPathActivity[]; active: string | null; setActive: (id: string | null) => void }) {
-  if (activities.length === 0) return <LoadingState />;
-  return <NetworkBody activities={activities} active={active} setActive={setActive} />;
-}
+function NetworkBody({ snap, active, setActive, changed, showCost }: { snap: Snapshot; active: string | null; setActive: (id: string | null) => void; changed: string[]; showCost: boolean }) {
+  const rows = snap.rows;
+  const laneOrder = ['HCU-MS', 'CDU-MS', 'FCC-MS'];
+  const stableLane = (r: LiveRow) => (r.gate ? laneOrder.indexOf(r.gate) : 3);
+  const nodes: NetNode[] = rows.map((r) => ({ id: r.id, label: r.name, sub: r.path === 'Near' ? `float ${Math.round(r.floatDays)} d` : `${r.path} · float ${Math.round(r.floatDays)} d`, lane: stableLane(r), tone: critTone(r), tag: r.p6Id }));
+  const ids = new Set(rows.map((r) => r.id));
+  const edges: [string, string][] = rows.flatMap((r) => r.predecessors.filter((p) => ids.has(p)).map((p) => [p, r.id] as [string, string]));
+  const sel = rows.find((a) => a.id === active);
 
-function NetworkBody({ activities, active, setActive }: { activities: CriticalPathActivity[]; active: string | null; setActive: (id: string | null) => void }) {
-  const nodes: NetNode[] = activities.map((a) => ({ id: a.id, label: a.name, sub: a.path, lane: PATHS.indexOf(a.path), tone: toneFor(a.status), tag: META[a.id]?.p6Id }));
-  const edges: [string, string][] = activities.flatMap((a) => a.predecessors.map((p) => [p, a.id] as [string, string]));
-  const hot = activities.filter((a) => a.status !== 'on-track').map((a) => a.id);
-  const sel = activities.find((a) => a.id === active);
-
-  const succCount: Record<string, number> = {};
-  edges.forEach(([p]) => (succCount[p] = (succCount[p] ?? 0) + 1));
-  const topDriver = [...activities].sort((a, b) => (succCount[b.id] ?? 0) + (b.status === 'delayed' ? 5 : 0) - ((succCount[a.id] ?? 0) + (a.status === 'delayed' ? 5 : 0)))[0];
-  const negFloat = activities.filter((a) => a.floatDays < 0);
-
-  // resource insight: crews booked on overlapping activities
-  const byRes: Record<string, CriticalPathActivity[]> = {};
-  activities.forEach((a) => (byRes[a.resource] ??= []).push(a));
-  const conflicts = Object.entries(byRes).filter(([, list]) =>
-    list.some((x, i) => list.some((y, j) => j > i && Math.abs(+new Date(x.plannedFinish) - +new Date(y.plannedFinish)) < 3 * 86_400_000))
-  );
-  const cpCost = activities.reduce((s, a) => s + a.costOMR, 0);
-  const slipDays = Math.max(...activities.map((a) => Math.round((+new Date(a.forecastFinish) - +new Date(a.plannedFinish)) / 86_400_000)));
+  const driver = [...rows].filter((r) => r.crit === 'critical').sort((a, b) => b.successors.length + b.ownDelay * 3 - (a.successors.length + a.ownDelay * 3))[0] ?? rows[0];
+  const behind = rows.filter((r) => r.floatDays < 0);
+  const byRes: Record<string, LiveRow[]> = {};
+  rows.filter((r) => r.crit !== 'normal').forEach((r) => (byRes[r.resource] ??= []).push(r));
+  const clash = Object.entries(byRes).filter(([, l]) => l.length > 1);
+  const cpCost = rows.filter((r) => r.crit === 'critical').reduce((s, r) => s + r.costOMR, 0);
+  const laneLabels = laneOrder.map((g) => `${snap.chains.find((c) => c.gate === g)!.label} ${CHAIN_NAMES[g].split(' · ')[0]}`).concat('Near-critical');
 
   return (
     <div className="stack" style={{ gap: 16 }}>
       <div className="grid grid-4">
         <Card>
           <div className="eyebrow">Dependencies</div>
-          <div style={{ fontWeight: 600, margin: '4px 0' }}>{topDriver.id} drives {succCount[topDriver.id] ?? 0} successors</div>
-          <p className="small muted" style={{ margin: 0 }}>{topDriver.name} is {topDriver.status}; its slip flows to {edges.filter(([p]) => p === topDriver.id).map(([, s]) => s).join(', ') || 'no successors'}.</p>
+          <div style={{ fontWeight: 600, margin: '4px 0' }}>{driver.id} drives {driver.successors.length} successor{driver.successors.length === 1 ? '' : 's'}</div>
+          <p className="small muted" style={{ margin: 0 }}>{driver.name}{driver.ownDelay > 0 ? ` carries ${driver.ownDelay} d of own delay; ` : ' is the busiest critical activity; '}its slip flows to {driver.successors.join(', ') || 'no successors'}.</p>
         </Card>
         <Card>
           <div className="eyebrow">Logic</div>
           <div style={{ fontWeight: 600, margin: '4px 0' }}>{edges.length} links, all finish-to-start</div>
-          <p className="small muted" style={{ margin: 0 }}>{negFloat.length} activities carry negative float ({negFloat.map((n) => n.id).join(', ')}). 0 open ends, 0 constraint conflicts.</p>
+          <p className="small muted" style={{ margin: 0 }}>{behind.length ? `${behind.length} activities are behind a contractual date (negative float): ${behind.slice(0, 4).map((n) => n.id).join(', ')}${behind.length > 4 ? '…' : ''}.` : 'No activity is behind a contractual date.'} No open ends, no logic loops.</p>
         </Card>
         <Card>
           <div className="eyebrow">Resource</div>
-          <div style={{ fontWeight: 600, margin: '4px 0' }}>{conflicts.length} crew booked back-to-back</div>
-          <p className="small muted" style={{ margin: 0 }}>{conflicts.length ? `${conflicts.map(([r]) => r).slice(0, 2).join(', ')} are on consecutive critical activities: no slack to absorb a delay.` : 'No crew conflicts on the critical path.'}</p>
+          <div style={{ fontWeight: 600, margin: '4px 0' }}>{clash.length} crew{clash.length === 1 ? '' : 's'} on more than one critical activity</div>
+          <p className="small muted" style={{ margin: 0 }}>{clash.length ? `${clash.slice(0, 2).map(([r]) => r).join(', ')}: a slip on one activity delays the crew's next critical activity.` : 'No crew conflicts on critical work.'}</p>
         </Card>
         <Card>
           <div className="eyebrow">Cost</div>
-          <div style={{ fontWeight: 600, margin: '4px 0' }}>OMR {(cpCost / 1e6).toFixed(2)}M on the critical path</div>
-          <p className="small muted" style={{ margin: 0 }}>Each day of slip burns about OMR {STANDING_COST_PER_DAY.toLocaleString()} of fixed logistics. Current worst slip: {slipDays} days.</p>
+          <div style={{ fontWeight: 600, margin: '4px 0' }}>{showCost ? `OMR ${(cpCost / 1e6).toFixed(2)}M on critical activities` : `${snap.critCount} critical activities`}</div>
+          <p className="small muted" style={{ margin: 0 }}>{showCost ? STANDING_COST_NOTE : 'Cost values are restricted for contractors.'} Current slip: {snap.slipDays.toFixed(1)} days.</p>
         </Card>
       </div>
 
       <Card>
         <CardHeader
-          title="Dependency network: CP1 reactor R-101 · CP2 E-204 / Train B · CP3 compressor C-301"
+          title="Dependency network by chain"
           action={
             <div className="chart-legend" style={{ margin: 0 }}>
-              <span><i style={{ background: 'var(--good)' }} />On track</span>
-              <span><i style={{ background: 'var(--warn)' }} />At risk</span>
-              <span><i style={{ background: 'var(--crit)' }} />Delayed</span>
-              <span><i style={{ background: 'var(--crit)', height: 2 }} />Delay propagation</span>
+              <span><i style={{ background: 'var(--crit)' }} />Critical</span>
+              <span><i style={{ background: 'var(--warn)' }} />Near-critical</span>
+              <span><i style={{ background: 'var(--good)' }} />Float to spare</span>
+              {changed.length > 0 && <span><i style={{ background: 'var(--accent)', height: 2 }} />Changed by the last delay</span>}
             </div>
           }
         />
-        <NetworkGraph nodes={nodes} edges={edges} laneLabels={['CP1', 'CP2', 'CP3']} highlight={hot} onNodeClick={setActive} activeId={active} />
+        <NetworkGraph nodes={nodes} edges={edges} laneLabels={laneLabels} highlight={changed} onNodeClick={setActive} activeId={active} />
       </Card>
 
       {sel && (
         <Card>
-          <CardHeader title={`${sel.id} · ${sel.name}`} action={<Chip tone={toneFor(sel.status)}>{sel.status}</Chip>} />
+          <CardHeader title={`${sel.id} · ${sel.name}`} action={<Chip tone={critTone(sel)}>{sel.crit === 'critical' ? 'critical' : sel.crit === 'near' ? 'near-critical' : 'float to spare'}</Chip>} />
           <div className="grid grid-3">
             <dl className="kv">
-              <dt>Path</dt><dd>{sel.path}</dd>
+              <dt>Chain</dt><dd>{sel.path === 'Near' ? 'near-critical work' : `${sel.path} · ${sel.chain}`}</dd>
               <dt>Owner</dt><dd>{sel.owner}</dd>
               <dt>Resource</dt><dd>{sel.resource}</dd>
-              <dt>Cost</dt><dd className="mono">OMR {sel.costOMR.toLocaleString()}</dd>
+              {showCost && (<><dt>Cost</dt><dd className="mono">OMR {sel.costOMR.toLocaleString()}</dd></>)}
             </dl>
             <dl className="kv">
-              <dt>Duration</dt><dd>{sel.durationDays} d</dd>
-              <dt>Planned finish</dt><dd className="mono">{longDate(sel.plannedFinish)}</dd>
-              <dt>Forecast</dt><dd className="mono">{longDate(sel.forecastFinish)}</dd>
-              <dt>Float</dt><dd className="mono">{sel.floatDays} d</dd>
+              <dt>Remaining</dt><dd>{sel.remaining} d{sel.ownDelay ? ` (incl. ${sel.ownDelay} d delay)` : ''}</dd>
+              <dt>Planned finish</dt><dd className="mono">{longDate(dayToDate(Math.round(sel.planFinish)))}</dd>
+              <dt>Forecast</dt><dd className="mono">{longDate(dayToDate(Math.round(sel.finish)))}</dd>
+              <dt>Total float</dt><dd className="mono">{Math.round(sel.floatDays)} d</dd>
             </dl>
             <dl className="kv">
               <dt>Predecessors</dt><dd className="mono">{sel.predecessors.join(', ') || 'none'}</dd>
-              <dt>Successors</dt><dd className="mono">{activities.filter((a) => a.predecessors.includes(sel.id)).map((a) => a.id).join(', ') || 'none'}</dd>
-              <dt>P6 / SAP</dt><dd><IdChips p6Id={META[sel.id]?.p6Id} sapWo={META[sel.id]?.sapWo} /></dd>
+              <dt>Successors</dt><dd className="mono">{sel.successors.join(', ') || 'none'}</dd>
+              <dt>P6 / SAP</dt><dd><IdChips p6Id={sel.p6Id} sapWo={META[sel.id]?.sapWo} /></dd>
               <dt>Changed</dt><dd>{sel.changeCount}× this TA</dd>
             </dl>
           </div>
         </Card>
       )}
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------ live monitor (simulated)
-
-function MonitorTab({ onChange }: { onChange: () => void }) {
-  const { showToast } = useToast();
-  const [list, setList] = useState<NearCritical[]>([]);
-  const [feed, setFeed] = useState<{ at: string; text: string; crit: boolean }[]>([]);
-  const [live, setLive] = useState(false);
-  const busy = useRef(false);
-
-  useEffect(() => {
-    getNearCritical().then(setList);
-  }, []);
-
-  const tick = useCallback(async () => {
-    if (busy.current) return;
-    busy.current = true;
-    const r = await tickMonitor();
-    setList(r.list);
-    if (r.event) {
-      const crit = r.event.includes('CRITICAL');
-      setFeed((f) => [{ at: new Date().toLocaleTimeString('en-GB'), text: r.event!, crit }, ...f].slice(0, 12));
-      if (crit) {
-        showToast(r.event, 'crit');
-        onChange();
-      }
-    }
-    busy.current = false;
-  }, [onChange, showToast]);
-
-  useEffect(() => {
-    if (!live) return;
-    const id = setInterval(tick, 3500);
-    return () => clearInterval(id);
-  }, [live, tick]);
-
-  const critNow = list.filter((n) => n.floatDays <= 0);
-  return (
-    <div className="stack" style={{ gap: 16 }}>
-      <Card>
-        <div className="spread">
-          <div>
-            <h3 style={{ fontSize: 17 }}>Real-time monitoring <span className="sim-badge sim-simulated">Simulated</span></h3>
-            <p className="small muted" style={{ margin: '4px 0 0', maxWidth: 720 }}>
-              In production this runs on every P6 recalculation. Here a timer feeds execution delays into near-critical activities: when float reaches zero the activity is flagged as newly critical automatically and counted as a critical path change.
-            </p>
-          </div>
-          <div className="row">
-            <ActionButton onClick={tick}>Simulate delay now</ActionButton>
-            <ActionButton variant={live ? 'danger' : 'primary'} small={false} onClick={() => setLive((l) => !l)}>{live ? 'Pause live feed' : 'Start live feed'}</ActionButton>
-          </div>
-        </div>
-      </Card>
-      <div className="grid grid-4">
-        <StatTile label="Near-critical watched" value={String(list.length)} />
-        <StatTile label="Newly critical" value={String(critNow.length)} tone={critNow.length ? 'crit' : 'good'} />
-        <StatTile label="Smallest float" value={`${Math.min(...list.map((n) => n.floatDays), 9)} d`} tone="warn" />
-        <StatTile label="Feed" value={live ? 'LIVE' : 'paused'} tone={live ? 'good' : 'neutral'} />
-      </div>
-      <div className="grid grid-2" style={{ alignItems: 'start' }}>
-        <Card>
-          <CardHeader title="Near-critical activities" />
-          {list.map((n) => (
-            <div key={n.id} className="list-row" style={{ alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <strong>{n.name}</strong>
-                <div className="small muted">{n.id} · {n.path} · driver: {n.driver}</div>
-                <div style={{ marginTop: 6, maxWidth: 260 }}><ProgressBar value={Math.max(0, n.floatDays)} max={5} tone={n.floatDays <= 0 ? 'crit' : n.floatDays <= 1 ? 'warn' : 'good'} showLabel={false} /></div>
-              </div>
-              <Chip tone={n.floatDays <= 0 ? 'crit' : n.floatDays <= 1 ? 'warn' : 'good'}>{n.floatDays <= 0 ? 'CRITICAL' : `float ${n.floatDays} d`}</Chip>
-            </div>
-          ))}
-        </Card>
-        <Card>
-          <CardHeader title="Event feed" />
-          {feed.length === 0 && <p className="small muted">No events yet. Press “Simulate delay now” or start the live feed.</p>}
-          {feed.map((f, i) => (
-            <div key={i} className="list-row" style={{ alignItems: 'flex-start' }}>
-              <span style={{ color: f.crit ? 'var(--crit)' : undefined, fontWeight: f.crit ? 700 : 400 }}>{f.text}</span>
-              <span className="mono small muted">{f.at}</span>
-            </div>
-          ))}
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------ CP change report
-
-function ChangesTab({ days, total, activities }: { days: CpDay[]; total: number; activities: CriticalPathActivity[] }) {
-  const worst = [...days].sort((a, b) => b.changes - a.changes)[0];
-  const [report, setReport] = useState(false);
-  const byActivity = useMemo(() => [...activities].sort((a, b) => b.changeCount - a.changeCount).slice(0, 5), [activities]);
-  return (
-    <div className="stack" style={{ gap: 16 }}>
-      <div className="grid grid-4">
-        <StatTile label="Critical path changed" value={`${total}×`} tone="crit" delta="in 14 TA days" />
-        <StatTile label="Today" value={String(days[days.length - 1]?.changes ?? 0)} tone="warn" />
-        <StatTile label="Busiest day" value={worst ? `D${worst.day}` : '—'} delta={worst ? `${worst.changes} changes` : undefined} />
-        <StatTile label="Average per day" value={(total / Math.max(1, days.length)).toFixed(1)} />
-      </div>
-      <div className="grid grid-3-2" style={{ alignItems: 'start' }}>
-        <Card>
-          <CardHeader title="Changes to the critical path per TA day" />
-          <BarChart height={240} labels={days.map((d) => `D${d.day}`)} series={[{ name: 'Changes', color: 'var(--crit)', data: days.map((d) => d.changes) }]} />
-        </Card>
-        <Card>
-          <CardHeader title="Most-changed activities" />
-          {byActivity.map((a) => (
-            <div key={a.id} className="list-row"><span>{a.name}<div className="small muted mono">{a.id} · {a.path}</div></span><span className="mono" style={{ fontWeight: 700 }}>{a.changeCount}×</span></div>
-          ))}
-        </Card>
-      </div>
-      <Card>
-        <CardHeader title="Daily change log" action={<button className="btn btn-primary btn-sm" onClick={() => setReport((r) => !r)}>{report ? 'Hide' : 'Generate'} end-of-TA report</button>} />
-        <DataTable
-          dense
-          rowKey={(d: CpDay) => String(d.day)}
-          rows={[...days].reverse()}
-          columns={[
-            { key: 'day', header: 'TA day', mono: true, render: (d) => `D${d.day}`, sortValue: (d) => d.day },
-            { key: 'changes', header: 'Changes', mono: true, align: 'right' },
-            { key: 'note', header: 'What changed', render: (d) => d.note || <span className="muted">no structural change</span> },
-          ]}
-        />
-        {report && (
-          <div className="callout" style={{ marginTop: 14 }}>
-            <strong>End-of-TA report: critical path changes.</strong> The critical path changed {total} times over {days.length} days (average {(total / days.length).toFixed(1)} per day). Peak: Day {worst?.day} with {worst?.changes} changes. Main drivers: crane conflicts, discovery work on R-101 internals, scaffold access and tie-in spool rework. This section is also included in the Close-Out report.
-          </div>
-        )}
-      </Card>
+      <StatTile label="Network" value={`${rows.length} monitored activities`} delta={`${snap.critCount} critical · ${snap.nearCount} near-critical`} />
     </div>
   );
 }

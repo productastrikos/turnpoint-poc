@@ -1,4 +1,4 @@
-// Local integration bus between TURNPOINT and the SAP / Primavera P6 stand-in consoles (/ext/sap, /ext/p6).
+// Local integration bus between OQ and the SAP / Primavera P6 stand-in consoles (/ext/sap, /ext/p6).
 // A BroadcastChannel: every tab, window and iframe of this app on the same machine sees every message, nothing leaves
 // the browser. Payloads use the field names the real interfaces carry (SAP OData API_MAINTENANCEORDER /
 // API_MAINTNOTIFICATION, P6 TASK fields), so the console screens and the message log read like the real thing.
@@ -18,7 +18,7 @@ export interface SapNotification {
   ReportedByUser: string;
   CreationDate: string;
   NotifProcessingPhaseDesc: string; // Outstanding, In process, Completed
-  // TURNPOINT extension fields (custom fields on the notification, populated by the planner)
+  // OQ extension fields (custom fields on the notification, populated by the planner)
   ZZ_Discipline: Discipline;
   ZZ_Area: string;
   ZZ_EstCostOMR: number;
@@ -44,6 +44,21 @@ export interface SapOrder {
   ZZ_TurnpointRef?: string;
 }
 
+/** A scope item OQ has just created (manual entry, bulk upload, Excel import), as SAP needs it to open a maintenance order. */
+export interface ScopeSapItem {
+  ref: string; // OQ scope item id (J-xxxx)
+  desc: string;
+  tag: string;
+  area: string;
+  discipline: Discipline;
+  costOMR: number;
+  manhours: number;
+  likelihood: number;
+  consequence: number;
+  /** order number SAP should use; the stand-in derives the same number OQ shows on the item */
+  order: string;
+}
+
 export interface FieldChange {
   field: string;
   label: string;
@@ -53,7 +68,7 @@ export interface FieldChange {
 
 export interface P6ActivityChange {
   activityId: string; // P6 Activity ID
-  tpId?: string; // TURNPOINT activity id (CPA-xxx, ACT-xxx)
+  tpId?: string; // OQ activity id (CPA-xxx, ACT-xxx)
   name: string;
   finishBefore: number; // TA day
   finishAfter: number;
@@ -83,15 +98,19 @@ export type BusMessage =
   | { type: 'hello'; system: SystemId; /** asks the other side to answer with its own hello */ ping?: boolean }
   | { type: 'reset' }
   | { type: 'demo.run'; action: DemoAction }
-  // SAP -> TURNPOINT
+  // SAP -> OQ
   | { type: 'sap.notification.created'; notification: SapNotification }
   | { type: 'sap.order.changed'; order: SapOrder; changes: FieldChange[] }
-  // TURNPOINT -> SAP
+  /** SAP's acknowledgement that the orders for a batch exist. */
+  | { type: 'sap.scope.confirmed'; batch: string; orders: { ref: string; order: string }[] }
+  // OQ -> SAP
   | { type: 'tp.order.upsert'; order: Partial<SapOrder> & { MaintenanceOrder: string }; note: string }
   | { type: 'tp.notification.update'; MaintenanceNotification: string; phase: string; ref?: string; note: string }
-  // P6 -> TURNPOINT
+  /** New scope items created in OQ (manual, bulk, Excel): SAP opens one maintenance order each and acknowledges with sap.scope.confirmed. */
+  | { type: 'tp.scope.created'; batch: string; channel: string; items: ScopeSapItem[] }
+  // P6 -> OQ
   | { type: 'p6.rescheduled'; result: P6Reschedule }
-  // TURNPOINT -> P6
+  // OQ -> P6
   | { type: 'tp.progress'; tpId: string; pct: number; by: string; via: string }
   | { type: 'tp.activity.added'; tpId: string; name: string; afterTpId: string; beforeTpId?: string; durationDays: number; source: string };
 

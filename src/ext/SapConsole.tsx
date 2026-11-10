@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { changeOrder, connectSap, createNotification, EXAMPLE_NOTIFICATIONS, funcLoc, getSapState, subscribeSap } from '../integration/sapStore';
 import type { SapNotification, SapOrder } from '../integration/bus';
 import { AREA_IDS, DISCIPLINES } from '../mocks/master';
@@ -6,8 +7,8 @@ import type { Discipline } from '../types';
 import './ext.css';
 
 type Tab = 'notifications' | 'orders' | 'log';
-const STATUS_TONE: Record<string, string> = { Inbound: 'info', Sent: 'good', Outstanding: 'warn', 'In process': 'info', Completed: 'good', REL: 'good', CRTD: 'none', TECO: 'info', SFRZ: 'info', APRV: 'good', TPSC: 'warn', DUPL: 'crit', SCFA: 'good' };
-const USER_STATUS_TEXT: Record<string, string> = { SFRZ: 'Scope frozen', APRV: 'TA approved', TPSC: 'In TA scoping', DUPL: 'Duplicate', SCFA: 'SCF approved', INIT: 'Initial' };
+const STATUS_TONE: Record<string, string> = { Inbound: 'info', Sent: 'good', Outstanding: 'warn', 'In process': 'info', Completed: 'good', REL: 'good', CRTD: 'none', TECO: 'info', SFRZ: 'info', APRV: 'good', TPSC: 'warn', GT1: 'info', GT2: 'info', DUPL: 'crit', SCFA: 'good', DEFR: 'none' };
+const USER_STATUS_TEXT: Record<string, string> = { SFRZ: 'Scope frozen', APRV: 'TA approved', TPSC: 'In TA scoping', GT1: 'Gate 1 approved', GT2: 'Gate 2 approved', DUPL: 'Duplicate', SCFA: 'SCF approved', DEFR: 'Deferred', INIT: 'Initial' };
 const omr = (v: number) => v.toLocaleString('en-US');
 
 function Status({ code, text }: { code: string; text?: string }) {
@@ -80,7 +81,7 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
             <label>Planned work (hours)</label>
             <input type="number" value={f.ZZ_Manhours || ''} onChange={(e) => set('ZZ_Manhours', Number(e.target.value))} />
           </div>
-          <div className="full sapx-hint">Saving raises the notification here and sends it to TURNPOINT at once (event-driven), where it becomes a scope item at Gate 1 and is checked for duplicates.</div>
+          <div className="full sapx-hint">Saving raises the notification here and sends it to OQ at once (event-driven), where it becomes a scope item at Gate 1 and is checked for duplicates.</div>
         </div>
         <footer>
           <button className="sapx-btn" onClick={onClose}>Cancel</button>
@@ -117,7 +118,7 @@ function OrderDialog({ order, onClose }: { order: SapOrder; onClose: () => void 
             </select>
           </div>
           <div><label>User status</label><input value={`${order.UserStatusText}${USER_STATUS_TEXT[order.UserStatusText] ? ` · ${USER_STATUS_TEXT[order.UserStatusText]}` : ''}`} readOnly /></div>
-          <div className="full sapx-hint">Changes to cost, priority or status are sent to TURNPOINT on save. TURNPOINT owns scope approval and progress; SAP owns cost and order status.</div>
+          <div className="full sapx-hint">Changes to cost, priority or status are sent to OQ on save. OQ owns scope approval and progress; SAP owns cost and order status.</div>
         </div>
         <footer>
           <button className="sapx-btn" onClick={onClose}>Cancel</button>
@@ -128,11 +129,31 @@ function OrderDialog({ order, onClose }: { order: SapOrder; onClose: () => void 
   );
 }
 
-/** Stand-in for the client's SAP S/4HANA maintenance apps (Fiori-style). Demo only, talks to TURNPOINT over the local bus. */
+/** Stand-in for the client's SAP S/4HANA maintenance apps (Fiori-style). Demo only, talks to OQ over the local bus. */
 export default function SapConsole() {
   const s = useSyncExternalStore(subscribeSap, getSapState, getSapState);
-  const [tab, setTab] = useState<Tab>('notifications');
+  // ?compact=1 is the narrow layout used when SAP is docked beside OQ; ?tab= picks the starting tab
+  const [params] = useSearchParams();
+  const compact = params.get('compact') === '1';
+  const startTab = params.get('tab');
+  const [tab, setTab] = useState<Tab>(startTab === 'orders' || startTab === 'log' || startTab === 'notifications' ? startTab : 'notifications');
   const [q, setQ] = useState('');
+  // OQ just sent something: show the tab it landed on, with no search filter hiding it
+  const inboundAt = s.inbound?.at;
+  const inboundTab = s.inbound?.tab;
+  useEffect(() => {
+    if (!inboundAt || !inboundTab) return;
+    setTab(inboundTab);
+    setQ('');
+  }, [inboundAt, inboundTab]);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!s.inbound) return;
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [s.inbound]);
+  const showBanner = s.inbound !== null && Date.now() - s.inbound.at < 12_000;
+  const pinFirst = <T,>(rows: T[], key: (r: T) => string) => [...rows.filter((r) => s.pinned.includes(key(r))), ...rows.filter((r) => !s.pinned.includes(key(r)))];
   const [create, setCreate] = useState(false);
   const [edit, setEdit] = useState<SapOrder | null>(null);
   useEffect(() => connectSap(), []);
@@ -141,30 +162,36 @@ export default function SapConsole() {
   }, []);
 
   const match = (t: string) => !q || t.toLowerCase().includes(q.toLowerCase());
-  const notifs = s.notifications.filter((n) => match(`${n.MaintenanceNotification} ${n.NotificationText} ${n.TechnicalObject} ${n.ZZ_TurnpointRef ?? ''}`));
-  const orders = s.orders.filter((o) => match(`${o.MaintenanceOrder} ${o.MaintenanceOrderDesc} ${o.Equipment} ${o.ZZ_TurnpointRef ?? ''}`));
-  const byTp = s.log.filter((l) => l.user === 'TURNPOINT_INT').length;
+  const notifs = pinFirst(s.notifications, (n) => n.MaintenanceNotification).filter((n) => match(`${n.MaintenanceNotification} ${n.NotificationText} ${n.TechnicalObject} ${n.ZZ_TurnpointRef ?? ''}`));
+  const orders = pinFirst(s.orders, (o) => o.MaintenanceOrder).filter((o) => match(`${o.MaintenanceOrder} ${o.MaintenanceOrderDesc} ${o.Equipment} ${o.ZZ_TurnpointRef ?? ''}`));
+  const byTp = s.log.filter((l) => l.user === 'OQ_INT').length;
 
   return (
-    <div className="sapx">
+    <div className={`sapx ${compact ? 'compact' : ''}`}>
       <div className="sapx-shell">
         <span className="sapx-logo">S/4</span>
         <span className="sapx-title">Maintenance Planning</span>
         <span className="sapx-sub">S/4HANA · Plant SOH1 Sohar Refinery</span>
         <span style={{ flex: 1 }} />
-        <span className="sapx-pill" title="Messages to and from TURNPOINT travel over the local integration bus"><span className={`sapx-dot ${s.connected ? 'on' : ''}`} /> TURNPOINT {s.connected ? 'connected' : 'waiting'}</span>
+        <span className="sapx-pill" title="Messages to and from OQ travel over the local integration bus"><span className={`sapx-dot ${s.connected ? 'on' : ''}`} /> OQ {s.connected ? 'connected' : 'waiting'}</span>
         <span className="sapx-avatar" title="PLANNER01, maintenance planner">PL</span>
       </div>
       <div className="sapx-page">
         <div className="sapx-head">
           <h1>Turnaround STO-2026: notifications and orders</h1>
-          <p>Planner view of the maintenance backlog feeding the turnaround. Create a notification or change an order and watch TURNPOINT react; approvals and the scope freeze in TURNPOINT come back here.</p>
+          <p>Planner view of the maintenance backlog feeding the turnaround. Create a notification or change an order and watch OQ react; approvals and the scope freeze in OQ come back here.</p>
         </div>
+        {showBanner && s.inbound && (
+          <div className="sapx-banner" role="status" data-testid="sap-inbound-banner">
+            <span className="sapx-banner-tick">✓</span>
+            <span><strong>Received from OQ</strong> · {s.inbound.count > 1 && !/created from OQ/.test(s.inbound.label) ? `${s.inbound.count} ${s.inbound.tab === 'orders' ? 'orders' : 'notifications'} updated at once (bulk update)` : s.inbound.label}</span>
+          </div>
+        )}
         <div className="sapx-kpis">
           <div className="sapx-kpi"><div className="k">Outstanding notifications</div><div className="v">{s.notifications.filter((n) => n.NotifProcessingPhaseDesc === 'Outstanding').length}</div></div>
           <div className="sapx-kpi"><div className="k">Orders in TA scope</div><div className="v">{s.orders.length}</div></div>
           <div className="sapx-kpi"><div className="k">Scope frozen (SFRZ)</div><div className="v">{s.orders.filter((o) => o.UserStatusText === 'SFRZ').length}</div></div>
-          <div className="sapx-kpi"><div className="k">Changes from TURNPOINT today</div><div className="v">{byTp}</div></div>
+          <div className="sapx-kpi"><div className="k">Changes from OQ today</div><div className="v">{byTp}</div></div>
         </div>
         <div className="sapx-tabs" role="tablist">
           <button className={`sapx-tab ${tab === 'notifications' ? 'on' : ''}`} onClick={() => setTab('notifications')}>Notifications<span className="n">({s.notifications.length})</span></button>
@@ -182,7 +209,7 @@ export default function SapConsole() {
           )}
           {tab === 'notifications' && (
             <table className="sapx-table">
-              <thead><tr><th>Notification</th><th>Description</th><th>Type</th><th>Priority</th><th>Technical object</th><th>Reported by</th><th>Created</th><th>Status</th><th>TURNPOINT</th></tr></thead>
+              <thead><tr><th>Notification</th><th>Description</th><th>Type</th><th>Priority</th><th>Technical object</th><th>Reported by</th><th>Created</th><th>Status</th><th>OQ</th></tr></thead>
               <tbody>
                 {notifs.map((n) => (
                   <tr key={n.MaintenanceNotification} className={s.flash.includes(n.MaintenanceNotification) ? 'flash' : ''}>
@@ -202,7 +229,7 @@ export default function SapConsole() {
           )}
           {tab === 'orders' && (
             <table className="sapx-table">
-              <thead><tr><th>Order</th><th>Description</th><th>Type</th><th>Equipment</th><th>Prio</th><th>System status</th><th>User status</th><th style={{ textAlign: 'right' }}>Planned cost (OMR)</th><th>Last changed by</th><th>TURNPOINT</th></tr></thead>
+              <thead><tr><th>Order</th><th>Description</th><th>Type</th><th>Equipment</th><th>Prio</th><th>System status</th><th>User status</th><th style={{ textAlign: 'right' }}>Planned cost (OMR)</th><th>Last changed by</th><th>OQ</th></tr></thead>
               <tbody>
                 {orders.map((o) => (
                   <tr key={o.MaintenanceOrder} className={`click ${s.flash.includes(o.MaintenanceOrder) ? 'flash' : ''}`} onClick={() => setEdit(o)}>
@@ -214,7 +241,7 @@ export default function SapConsole() {
                     <td><Status code={o.SystemStatusText} /></td>
                     <td>{o.UserStatusText ? <Status code={o.UserStatusText} text={USER_STATUS_TEXT[o.UserStatusText]} /> : null}</td>
                     <td className="sapx-mono" style={{ textAlign: 'right' }}>{omr(o.PlannedCostOMR)}</td>
-                    <td><span className={o.LastChangedBy === 'TURNPOINT_INT' ? 'sapx-tpref' : ''}>{o.LastChangedBy}</span><div className="sapx-hint sapx-mono">{o.LastChangeDateTime}</div></td>
+                    <td><span className={o.LastChangedBy === 'OQ_INT' ? 'sapx-tpref' : ''}>{o.LastChangedBy}</span><div className="sapx-hint sapx-mono">{o.LastChangeDateTime}</div></td>
                     <td>{o.ZZ_TurnpointRef ? <span className="sapx-tpref">{o.ZZ_TurnpointRef}</span> : null}</td>
                   </tr>
                 ))}
@@ -222,14 +249,14 @@ export default function SapConsole() {
             </table>
           )}
           {tab === 'log' && (
-            s.log.length === 0 ? <div className="sapx-empty">No changes yet in this session. Create a notification, change an order, or approve / freeze scope in TURNPOINT.</div> : (
+            s.log.length === 0 ? <div className="sapx-empty">No changes yet in this session. Create a notification, change an order, or approve / freeze scope in OQ.</div> : (
               <table className="sapx-table">
                 <thead><tr><th>Time</th><th>User</th><th>Direction</th><th>Object</th><th>Change</th></tr></thead>
                 <tbody>
                   {s.log.map((l, i) => (
                     <tr key={`${l.at}-${i}`}>
                       <td className="sapx-mono">{l.at}</td>
-                      <td><span className={l.user === 'TURNPOINT_INT' ? 'sapx-tpref' : ''}>{l.user}</span></td>
+                      <td><span className={l.user === 'OQ_INT' ? 'sapx-tpref' : ''}>{l.user}</span></td>
                       <td>{l.dir === 'in' ? <Status code="Inbound" /> : <Status code="Sent" />}</td>
                       <td className="sapx-mono">{l.object}</td>
                       <td>{l.text}</td>
@@ -243,7 +270,7 @@ export default function SapConsole() {
       </div>
       {create && <CreateDialog onClose={() => setCreate(false)} />}
       {edit && <OrderDialog order={edit} onClose={() => setEdit(null)} />}
-      <div className="ext-ribbon">Demo stand-in for the client's SAP S/4HANA, not SAP software. Data lives in this browser and syncs with TURNPOINT over a local bus using the API_MAINTNOTIFICATION / API_MAINTENANCEORDER field names. Production: OData via SAP Integration Suite.</div>
+      <div className="ext-ribbon">Demo stand-in for the client's SAP S/4HANA, not SAP software. Data lives in this browser and syncs with OQ over a local bus using the API_MAINTNOTIFICATION / API_MAINTENANCEORDER field names. Production: OData via SAP Integration Suite.</div>
     </div>
   );
 }

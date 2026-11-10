@@ -115,7 +115,7 @@ export function CreatePlanDialog({ open, onClose, onCreated }: { open: boolean; 
       {!r ? (
         <div className="callout" style={{ marginTop: 14 }} role="status">
           <div className="row-wrap" style={{ justifyContent: 'space-between' }}><strong>Plan check</strong><SimBadge kind="model" /></div>
-          <div className="small" style={{ marginTop: 4 }}>Fill in the name, units, start date, duration, budget and man-hours. TURNPOINT compares them with STO-2024, STO-2026 and industry practice while you type, and warns when something looks wrong.</div>
+          <div className="small" style={{ marginTop: 4 }}>Fill in the name, units, start date, duration, budget and man-hours. OQ compares them with STO-2024, STO-2026 and industry practice while you type, and warns when something looks wrong.</div>
         </div>
       ) : (
         <div className={`callout callout-${tone}`} style={{ marginTop: 14, borderLeft: `4px solid var(--${tone})` }} role="status" aria-live="polite" data-testid="plan-guard">

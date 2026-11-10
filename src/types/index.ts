@@ -1,4 +1,4 @@
-// Shared domain types for the TURNPOINT POC. Mock data + services are typed against these.
+// Shared domain types for the OQ POC. Mock data + services are typed against these.
 
 // Checklist lifecycle stages: Initiation -> Scoping -> Planning & Procurement -> Pre-TA -> Execution -> Close-Out
 export type Phase = 'initiation' | 'scoping' | 'planning' | 'preTa' | 'execution' | 'closeout';

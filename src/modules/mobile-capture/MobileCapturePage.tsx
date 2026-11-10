@@ -1,4 +1,5 @@
 import { useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Chip } from '../../components/ui/Chip';
@@ -9,6 +10,8 @@ import { fieldUpdates } from '../../mocks/scheduleMock';
 import { useToast } from '../../app/ToastContext';
 import { useCanEdit } from '../../app/AccessContext';
 import { Icon } from '../../app/icons';
+import { ReportToolScreen } from './ReportToolScreen';
+import { HseScreen } from './HseScreens';
 
 const IN_PROGRESS = scheduleActivities.filter((a) => a.startDay <= 14 && a.endDay >= 14 && a.pct < 100 && !a.cp);
 const APPROVALS = [
@@ -29,13 +32,22 @@ function SimBars({ n }: { n: number }) {
 }
 
 const STATUS_TONE = { queued: 'warn', syncing: 'accent', synced: 'good' } as const;
-const ICON: Record<QueuedAction['kind'], ReactNode> = { progress: <Icon name="chart" size={14} />, approval: <Icon name="check" size={14} />, photo: <Icon name="camera" size={14} />, gps: <Icon name="pin" size={14} />, scan: <Icon name="grid" size={14} /> };
+const ICON: Record<QueuedAction['kind'], ReactNode> = { progress: <Icon name="chart" size={14} />, approval: <Icon name="check" size={14} />, photo: <Icon name="camera" size={14} />, gps: <Icon name="pin" size={14} />, scan: <Icon name="grid" size={14} />, 'tool-report': <Icon name="wrench" size={14} />, hse: <Icon name="shield" size={14} /> };
+type Screen = 'progress' | 'approvals' | 'capture' | 'tools' | 'hse';
+const TABS: { id: Screen; label: string; icon: string }[] = [
+  { id: 'progress', label: 'Progress', icon: 'chart' },
+  { id: 'approvals', label: 'Approvals', icon: 'check' },
+  { id: 'capture', label: 'Capture', icon: 'camera' },
+  { id: 'tools', label: 'Tools', icon: 'wrench' },
+  { id: 'hse', label: 'HSE', icon: 'shield' },
+];
 
 export default function MobileCapturePage() {
   const canEdit = useCanEdit();
   const { showToast } = useToast();
   const m = useSyncExternalStore(subscribeMobile, getMobileState, getMobileState);
-  const [screen, setScreen] = useState<'progress' | 'approvals' | 'capture'>('progress');
+  const navigate = useNavigate();
+  const [screen, setScreen] = useState<Screen>('progress');
   const [actId, setActId] = useState(IN_PROGRESS[0].id);
   const [pct, setPct] = useState(IN_PROGRESS[0].pct);
   const [photos, setPhotos] = useState(0);
@@ -48,7 +60,8 @@ export default function MobileCapturePage() {
   async function submitProgress() {
     const prev = fieldUpdates.find((u) => u.activityId === actId)?.pct ?? act.pct;
     const q = await enqueue({ kind: 'progress', label: `${act.p6Id} ${act.name}`, detail: `${prev}% → ${pct}%`, activityId: act.id, pct });
-    showToast(q.status === 'synced' ? `Progress ${pct}% synced to P6 (simulated)` : `Progress saved on the device: ${pct}%. It will sync when the SIM has signal.`, q.status === 'synced' ? 'good' : 'warn');
+    const synced = getMobileState().queue.find((x) => x.id === q.id)?.status === 'synced';
+    showToast(synced ? `Progress ${pct}% synced to P6 (simulated)` : `Progress saved on the device: ${pct}%. It will sync when the SIM has signal.`, synced ? 'good' : 'warn');
   }
   async function approve(a: (typeof APPROVALS)[number]) {
     setDone((d) => [...d, a.id]);
@@ -64,8 +77,10 @@ export default function MobileCapturePage() {
     });
   }
   async function doSync() {
+    const seen = new Set(getMobileState().queue.filter((q) => q.status === 'synced').map((q) => q.id));
     const n = await sync();
-    if (n) showToast(`${n} queued action${n > 1 ? 's' : ''} synced`, 'good');
+    const fresh = getMobileState().queue.filter((q) => q.status === 'synced' && !seen.has(q.id) && q.result);
+    if (n) showToast(fresh.length ? `${n} queued action${n > 1 ? 's' : ''} synced. ${fresh[0].result}` : `${n} queued action${n > 1 ? 's' : ''} synced`, 'good');
   }
   // SOW 4.69: the device synchronises automatically as soon as the network is available again.
   async function connect(online: boolean, mode: 'normal' | 'low' = 'normal') {
@@ -86,18 +101,18 @@ export default function MobileCapturePage() {
       />
 
       <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <div className="phone-frame">
-          <div className="phone-screen" style={{ padding: 0, gap: 0, minHeight: 600 }}>
+        <div className="phone-frame" style={{ width: 360 }}>
+          <div className="phone-screen" style={{ padding: 0, gap: 0, height: 720 }}>
             <div style={{ background: 'var(--ink)', color: 'var(--bg)', padding: '6px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
               <span>{m.online ? 'Omantel 4G' : 'No service'}</span>
               <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><SimBars n={m.signal} /><span className="mono">09:41</span></span>
             </div>
             <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-              <span className="eyebrow">TURNPOINT Field</span>
+              <span className="eyebrow">OQ Field</span>
               <Chip tone={!m.online ? 'crit' : queued ? 'warn' : 'good'}>{!m.online ? 'offline' : queued ? `${queued} to sync` : 'synced'}</Chip>
             </div>
 
-            <div style={{ padding: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ padding: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', minHeight: 0 }}>
               {screen === 'progress' && (
                 <>
                   <div className="eyebrow">Update progress</div>
@@ -126,6 +141,8 @@ export default function MobileCapturePage() {
                   ))}
                 </>
               )}
+              {screen === 'tools' && <ReportToolScreen canEdit={canEdit} />}
+              {screen === 'hse' && <HseScreen canEdit={canEdit} />}
               {screen === 'capture' && (
                 <>
                   <div className="eyebrow">Capture</div>
@@ -141,8 +158,11 @@ export default function MobileCapturePage() {
             </div>
 
             <div style={{ display: 'flex', borderTop: '1px solid var(--border)' }}>
-              {(['progress', 'approvals', 'capture'] as const).map((s) => (
-                <button key={s} onClick={() => setScreen(s)} style={{ flex: 1, padding: '10px 0', border: 'none', background: screen === s ? 'var(--accent-soft)' : 'transparent', color: screen === s ? 'var(--accent-strong)' : 'var(--ink-3)', fontWeight: 600, fontSize: 12, cursor: 'pointer', textTransform: 'capitalize' }}>{s}</button>
+              {TABS.map((t) => (
+                <button key={t.id} onClick={() => setScreen(t.id)} aria-label={t.label} style={{ flex: 1, padding: '7px 0 6px', border: 'none', background: screen === t.id ? 'var(--accent-soft)' : 'transparent', color: screen === t.id ? 'var(--accent-strong)' : 'var(--ink-3)', fontWeight: 600, fontSize: 10.5, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <Icon name={t.icon} size={16} />
+                  {t.label}
+                </button>
               ))}
             </div>
           </div>
@@ -173,11 +193,20 @@ export default function MobileCapturePage() {
             {m.queue.length === 0 && <p className="small muted" style={{ margin: 0 }}>Nothing recorded yet. Go offline, record some progress or approvals on the phone, then come back online.</p>}
             {m.queue.map((q) => (
               <div key={q.id} className="list-row">
-                <span><span style={{ marginRight: 8 }}>{ICON[q.kind]}</span><strong style={{ fontSize: 13 }}>{q.label}</strong><div className="small muted" style={{ paddingLeft: 26 }}>{q.detail} · captured {q.at}</div></span>
+                <span><span style={{ marginRight: 8 }}>{ICON[q.kind]}</span><strong style={{ fontSize: 13 }}>{q.label}</strong><div className="small muted" style={{ paddingLeft: 26 }}>{q.detail} · captured {q.at}</div>{q.result && <div className="small" style={{ paddingLeft: 26, color: 'var(--good)' }}>{q.result}</div>}</span>
                 <Chip tone={STATUS_TONE[q.status]}>{q.status}</Chip>
               </div>
             ))}
             {m.lastSyncAt && <p className="small muted" style={{ margin: '8px 0 0' }}>Last sync {m.lastSyncAt}. Synced progress appears in the P6 round trip (Integration Hub, step 2).</p>}
+          </Card>
+
+          <Card>
+            <CardHeader title="See what the phone sent" />
+            <p className="small muted" style={{ margin: '0 0 10px' }}>Tool reports and the contractor supervisor's HSE sheet go through the same offline queue. Once synced they show up on the web dashboard.</p>
+            <div className="row-wrap">
+              <button className="btn btn-primary" onClick={() => navigate('/tools-tracking')}>Open Broken & Missing Tools</button>
+              <button className="btn" onClick={() => navigate('/contractor-kpi')}>Open Contractor KPIs</button>
+            </div>
           </Card>
 
           <Card>
@@ -187,6 +216,7 @@ export default function MobileCapturePage() {
               <li>SIM-based connectivity with a visible signal state and a low-network mode</li>
               <li>Progress updates, approvals and data capture (photo, GPS, QR) in one app</li>
               <li>Ordered, visible sync when signal returns, with a log of what was sent</li>
+              <li>Operators report broken or missing tools; supervisors enter toolbox talks, housekeeping, permit and PPE checks</li>
             </ul>
             <p className="small muted" style={{ margin: '12px 0 0' }}>A styled web screen standing in for the native app. The SIM and the network are simulated by the toggle above.</p>
           </Card>

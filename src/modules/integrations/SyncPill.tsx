@@ -7,7 +7,7 @@ const LIVE_MS = 5 * 60_000;
 
 /**
  * Top bar indicator for the SAP / P6 story. With the stand-in consoles open it shows them as live (they are real
- * windows exchanging messages with TURNPOINT); otherwise the status is simulated. Either way the label says which.
+ * windows exchanging messages with OQ); otherwise the status is simulated. Either way the label says which.
  */
 export function SyncPill() {
   const hub = useHub();
@@ -19,7 +19,7 @@ export function SyncPill() {
   if (live.length) {
     const label = `${live.join(' · ')} stand-in${live.length > 1 ? 's' : ''} live`;
     return (
-      <Link to="/integrations?tab=live" className="sync-pill" title="SAP / P6 stand-in consoles are open and exchanging messages with TURNPOINT over the local integration bus (demo stand-ins, not the client's systems)." aria-label={`${label}. Open the live sync tab.`}>
+      <Link to="/integrations?tab=live" className="sync-pill" title="SAP / P6 stand-in consoles are open and exchanging messages with OQ over the local integration bus (demo stand-ins, not the client's systems)." aria-label={`${label}. Open the live sync tab.`}>
         <span className="sync-dot live" />
         <span className="sync-name">P6 · SAP</span>
         <span className="sync-state">{label.replace('P6 · SAP ', '')}</span>

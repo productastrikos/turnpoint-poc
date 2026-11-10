@@ -3,6 +3,7 @@ import { MODULE_BY_ID, NAV, PHASES, SECTIONS } from './moduleRegistry';
 import { usePhase } from './PhaseContext';
 import { useRole } from './RoleContext';
 import { Icon } from './icons';
+import { OqLogo } from './OqLogo';
 import { useLang } from '../i18n/lang';
 
 export function Sidebar({ collapsed }: { collapsed: boolean }) {
@@ -16,13 +17,8 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`} aria-label="Modules">
       <div className="sidebar-brand">
-        <div className="brand-mark">T</div>
-        {!collapsed && (
-          <div className="brand-text">
-            <strong>TURNPOINT</strong>
-            <span>{t('Turnaround Digitalization')}</span>
-          </div>
-        )}
+        <OqLogo size={collapsed ? 30 : 34} word={!collapsed} />
+
       </div>
       <nav className="sidebar-nav">
         {SECTIONS.map((section) => {

@@ -29,7 +29,7 @@ function Bar({ a, es, ef, tf }: { a: P6Activity; es: number; ef: number; tf: num
   );
 }
 
-/** Stand-in for the client's Primavera P6 EPPM (activities view with Gantt). Demo only, talks to TURNPOINT over the local bus. */
+/** Stand-in for the client's Primavera P6 EPPM (activities view with Gantt). Demo only, talks to OQ over the local bus. */
 export default function P6Console() {
   const s = useSyncExternalStore(subscribeP6, getP6State, getP6State);
   const [sel, setSel] = useState<string>('CDU-2020');
@@ -67,10 +67,10 @@ export default function P6Console() {
         <span className="p6x-chip">{P6_PROJECT_ID} · Major STO 2026, Sohar</span>
         <span className="p6x-chip">Data date {p6Date(STATUS_DAY)}</span>
         <span className="grow" />
-        <span className="p6x-chip" title="Messages to and from TURNPOINT travel over the local integration bus"><span className={`p6x-dot ${s.connected ? 'on' : ''}`} />TURNPOINT {s.connected ? 'connected' : 'waiting'}</span>
+        <span className="p6x-chip" title="Messages to and from OQ travel over the local integration bus"><span className={`p6x-dot ${s.connected ? 'on' : ''}`} />OQ {s.connected ? 'connected' : 'waiting'}</span>
       </div>
       <div className="p6x-bar">
-        <button className={`p6x-btn primary ${s.dirty ? 'warn' : ''}`} onClick={() => runSchedule()} title="Recalculate dates and float (CPM), then send changes to TURNPOINT">Schedule (F9)</button>
+        <button className={`p6x-btn primary ${s.dirty ? 'warn' : ''}`} onClick={() => runSchedule()} title="Recalculate dates and float (CPM), then send changes to OQ">Schedule (F9)</button>
         {s.dirty ? <span className="p6x-note warn">Changes not yet scheduled</span> : <span className="p6x-note">Last scheduled {s.lastScheduledAt}</span>}
         <label className="p6x-note" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={critOnly} onChange={(e) => setCritOnly(e.target.checked)} /> Critical only</label>
         <span className="grow" />
@@ -122,29 +122,29 @@ export default function P6Console() {
           {selected ? (
             <dl className="p6x-kv">
               <dt>Activity</dt><dd><strong>{selected.id}</strong> {selected.name}</dd>
-              <dt>TURNPOINT activity</dt><dd>{selected.tpId ?? '—'}{selected.path ? ` · ${selected.path}` : ''}</dd>
+              <dt>OQ activity</dt><dd>{selected.tpId ?? '—'}{selected.path ? ` · ${selected.path}` : ''}</dd>
               <dt>Durations</dt><dd>original {fmtDur(selected.origDur)} · remaining {fmtDur(selected.remDur)} · {selected.pct}% complete</dd>
               <dt>Dates</dt><dd>{p6Date(Math.floor(es[selected.id]) + 1)} to {p6Date(Math.ceil(ef[selected.id]))} · total float <span className={tf[selected.id] < 0 ? 'p6x-neg' : ''}>{fmtDur(Math.round(tf[selected.id] * 10) / 10)}</span></dd>
               <dt>Predecessors</dt><dd>{selected.preds.length ? selected.preds.map((p) => `${p.id} FS${p.lag ? ` ${p.lag > 0 ? '+' : ''}${p.lag}d` : ''}`).join(', ') : 'none'}</dd>
               <dt>Constraint</dt><dd>{selected.finishOnOrBefore !== undefined ? `Finish on or before ${p6Date(selected.finishOnOrBefore)}` : selected.startOnOrAfter !== undefined ? `Start on or after ${p6Date(selected.startOnOrAfter + 1)}` : 'none'}</dd>
               <dt>Last changed</dt><dd>{selected.changedBy ? `${selected.changedBy} · ${selected.changedAt}` : 'baseline load'}</dd>
-              <dt>Try</dt><dd className="p6x-note">Double-click Rem Dur, type a new value, Enter, then Schedule (F9). The new dates and float go to TURNPOINT.</dd>
+              <dt>Try</dt><dd className="p6x-note">Double-click Rem Dur, type a new value, Enter, then Schedule (F9). The new dates and float go to OQ.</dd>
             </dl>
           ) : (
             <div className="p6x-note">Select an activity.</div>
           )}
         </div>
         <div className="p6x-panel">
-          <h4>Integration with TURNPOINT</h4>
+          <h4>Integration with OQ</h4>
           <div className="p6x-log">
-            {s.log.length === 0 && <div className="p6x-note">No messages yet. Field progress from TURNPOINT appears here; Schedule (F9) sends changed dates back.</div>}
+            {s.log.length === 0 && <div className="p6x-note">No messages yet. Field progress from OQ appears here; Schedule (F9) sends changed dates back.</div>}
             {s.log.map((l, i) => (
               <div key={`${l.at}-${i}`}><span className={l.dir === 'in' ? 'p6x-in' : 'p6x-out'}>{l.dir === 'in' ? 'IN ' : 'OUT'}</span> <span className="p6x-num" style={{ display: 'inline' }}>{l.at.slice(11)}</span> {l.text}</div>
             ))}
           </div>
         </div>
       </div>
-      <div className="ext-ribbon">Demo stand-in for the client's Primavera P6, not Oracle software. Real CPM scheduling over the TA network; data lives in this browser and syncs with TURNPOINT over a local bus. Production: P6 EPPM REST API and XER.</div>
+      <div className="ext-ribbon">Demo stand-in for the client's Primavera P6, not Oracle software. Real CPM scheduling over the TA network; data lives in this browser and syncs with OQ over a local bus. Production: P6 EPPM REST API and XER.</div>
     </div>
   );
 }

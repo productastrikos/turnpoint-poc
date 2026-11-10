@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { StatTile } from '../../components/ui/StatTile';
@@ -26,6 +27,7 @@ import type { ProductivityRow } from '../../mocks/executionMock';
 import type { PostTaItem, HandoverDoc } from '../../mocks/closeoutMock';
 import { CostValue } from '../../components/ui/CostValue';
 import { useRole } from '../../app/RoleContext';
+import { FaultyToolsWidget } from '../tools-tracking/FaultyToolsWidget';
 
 interface Data {
   jobs: Job[];
@@ -76,6 +78,17 @@ export default function DisciplinesPage() {
   const docs = d.docs.filter((x) => x.discipline === active);
   const loss = d.loss.filter((l) => l.discipline === active);
   const approvedCost = jobs.filter((j) => j.status === 'approved').reduce((s, j) => s + j.costOMR, 0);
+  const matReady = packs.filter((p) => p.ready.materials).length;
+  const reworkH = loss.filter((l) => l.kind === 'Rework').reduce((s, l) => s + l.hours, 0);
+  const short = Math.max(0, d.headcount.plan - d.headcount.actual);
+  const mobPct = d.headcount.plan ? Math.round((d.headcount.actual / d.headcount.plan) * 100) : 0;
+  const focus = [
+    { sev: packs.length - matReady, text: `${packs.length - matReady} work pack${packs.length - matReady === 1 ? '' : 's'} still waiting for materials`, to: '/material-tracking' },
+    { sev: packs.length - ready, text: `${packs.length - ready} work pack${packs.length - ready === 1 ? '' : 's'} not yet ready to release`, to: '/work-packs' },
+    { sev: Math.ceil(short / 10), text: `${short} heads short of the mobilisation plan (${mobPct}% mobilised)`, to: '/mobilization' },
+    { sev: Math.ceil(reworkH / 20), text: `${reworkH} h of re-work to prevent`, to: '/pre-ta/rework-reports' },
+    { sev: ncrs.length * 2, text: `${ncrs.length} open NCR${ncrs.length === 1 ? '' : 's'}`, to: '/ncr' },
+  ].filter((f) => f.sev > 0).sort((a, b) => b.sev - a.sev).slice(0, 3);
 
   return (
     <div>
@@ -91,6 +104,17 @@ export default function DisciplinesPage() {
             <StatTile label={`${DISCIPLINE_CONTRACTOR[active]} on site`} value={`${d.headcount.actual}`} delta={`plan ${d.headcount.plan}`} tone="accent" />
             <StatTile label="Approved scope value" value={role === 'oq-staff' ? `OMR ${approvedCost.toLocaleString()}` : 'Restricted'} tone="good" />
           </div>
+          <div className="grid grid-4">
+            <StatTile label="Mobilisation" value={`${mobPct}%`} delta={`${short} heads short`} tone={mobPct >= 95 ? 'good' : 'warn'} />
+            <StatTile label="Materials ready" value={`${packs.length ? Math.round((matReady / packs.length) * 100) : 0}%`} delta={`${matReady} of ${packs.length} packs`} tone={matReady === packs.length ? 'good' : 'warn'} />
+            <StatTile label="Re-work so far" value={`${reworkH} h`} tone={reworkH > 100 ? 'crit' : 'neutral'} />
+            <StatTile label="Open priority items" value={String(focus.length)} tone={focus.length ? 'warn' : 'good'} />
+          </div>
+          <FaultyToolsWidget title="Faulty and missing tools (all contractors)" />
+          <Card>
+            <CardHeader title={`${active}: top focus areas for Pre-TA`} />
+            {focus.length === 0 ? <div className="empty-state">No priority items: this discipline is ready.</div> : focus.map((f, i) => <div key={f.text} className="list-row"><span><Chip tone={i === 0 ? 'crit' : 'warn'}>P{i + 1}</Chip> <span style={{ marginLeft: 8 }}>{f.text}</span></span><Link className="btn btn-sm" to={f.to}>Open</Link></div>)}
+          </Card>
           <Card>
             <CardHeader title={`${active}: work pack readiness`} />
             <DataTable

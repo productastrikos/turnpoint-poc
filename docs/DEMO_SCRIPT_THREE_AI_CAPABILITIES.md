@@ -37,7 +37,7 @@ Say: "A model scores every activity for slip risk, then 2,000 simulated runs giv
 
 ## 3. AI chatbot (2 min)
 
-**Open:** purple **Ask TURNPOINT** button in the top bar (works on any page), or left menu **AI Analytics** > tab **Assistant**.
+**Open:** purple **Ask S!a** button in the top bar (works on any page), or left menu **AI Analytics** > tab **S!a**.
 
 Suggested question chips show on a fresh chat; after the first question, type the rest:
 1. Click `What's blocking CP2 right now?` (shows "Read the critical path / Ran the risk model" steps and an **Open Critical Path** link).

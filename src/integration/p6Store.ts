@@ -1,7 +1,7 @@
-// System of record of the Primavera P6 stand-in console (/ext/p6). Seeded from the same schedule TURNPOINT shows, so
+// System of record of the Primavera P6 stand-in console (/ext/p6). Seeded from the same schedule OQ shows, so
 // Activity IDs and dates line up; it keeps its own state from then on, like a separate system would. The planner edits
 // durations here and presses Schedule (F9); the CPM result is compared with the last schedule and the changes are
-// published to TURNPOINT. Progress from TURNPOINT arrives on the bus and waits for the next F9, as it does in P6.
+// published to OQ. Progress from OQ arrives on the bus and waits for the next F9, as it does in P6.
 import { criticalPathActivities, nearCritical } from '../mocks/criticalPathMock';
 import { scheduleActivities } from '../mocks/scheduleMock';
 import { dateToDay, STATUS_DAY } from '../mocks/_gen';
@@ -48,6 +48,9 @@ const WBS_OF: Record<string, (typeof WBS)[number]> = { 'Unit 100': 'Unit 100 · 
 const UNIT_MS = { CP1: { id: 'HCU-MS', name: 'Unit 100 ready for start-up', due: 32, toEnd: 0 }, CP2: { id: 'CDU-MS', name: 'Unit 200 ready for start-up', due: 26, toEnd: 6 }, CP3: { id: 'FCC-MS', name: 'Unit 300 ready for start-up', due: 29, toEnd: 3 } } as const;
 const NEAR_IDS = ['ACT-231', 'ACT-244', 'ACT-318', 'ACT-352', 'ACT-367'];
 const EXTRA_IDS = ['ACT-203', 'ACT-108', 'ACT-109', 'ACT-502', 'ACT-602'];
+
+/** A fresh copy of the seeded P6 network (the same logic OQ's critical path monitor runs its own what-if CPM on). */
+export const seedP6Network = (): P6Activity[] => seed();
 
 function seed(): P6Activity[] {
   const byTp = Object.fromEntries(criticalPathActivities.map((a) => [a.id, a]));
@@ -106,7 +109,7 @@ function seed(): P6Activity[] {
       finishOnOrBefore: ef + float, // provisional; set from the CPM early finish below
     });
   }
-  // window end = early finish from the network + today's float, so P6 opens with the same float TURNPOINT shows
+  // window end = early finish from the network + today's float, so P6 opens with the same float OQ shows
   const first = schedule(toCpm(acts.map((a) => (a.tpId?.startsWith('ACT-') ? { ...a, finishOnOrBefore: undefined } : a))), STATUS_DAY);
   return acts.map((a) => (a.tpId?.startsWith('ACT-') ? { ...a, finishOnOrBefore: first.ef[a.id] + (nearCritical.find((n) => n.id === a.tpId)?.floatDays ?? 2) } : a));
 }
@@ -116,7 +119,7 @@ function seed(): P6Activity[] {
 export interface P6State {
   acts: P6Activity[];
   cpm: CpmResult;
-  /** Result of the last Schedule (F9): what TURNPOINT has been told. */
+  /** Result of the last Schedule (F9): what OQ has been told. */
   scheduled: CpmResult;
   dirty: boolean;
   log: P6LogEntry[];
@@ -162,7 +165,7 @@ export function editActivity(id: string, patch: Partial<Pick<P6Activity, 'origDu
   set({ acts, cpm: schedule(toCpm(acts), STATUS_DAY), dirty: true });
 }
 
-/** Schedule (F9): CPM over the network, compare with the last schedule, publish the differences to TURNPOINT. */
+/** Schedule (F9): CPM over the network, compare with the last schedule, publish the differences to OQ. */
 export function runSchedule(reason?: string): P6ActivityChange[] {
   const before = state.scheduled;
   const after = schedule(toCpm(state.acts), STATUS_DAY);
@@ -188,7 +191,7 @@ export function runSchedule(reason?: string): P6ActivityChange[] {
     scheduled: after,
     dirty: false,
     lastScheduledAt: stampNow(),
-    log: addLog('out', changes.length ? `Schedule (F9): ${changes.length} activit${changes.length === 1 ? 'y' : 'ies'} moved, sent to TURNPOINT. ${why}.` : `Schedule (F9): no date changes. ${why}.`),
+    log: addLog('out', changes.length ? `Schedule (F9): ${changes.length} activit${changes.length === 1 ? 'y' : 'ies'} moved, sent to OQ. ${why}.` : `Schedule (F9): no date changes. ${why}.`),
   });
   flash(changes.map((c) => c.activityId));
   return changes;
@@ -222,10 +225,10 @@ export function connectP6(): () => void {
       const remDur = Math.max(0, Math.round(a.origDur * (1 - m.pct / 100) * 10) / 10);
       const acts = state.acts.map((x) =>
         x.id === a.id
-          ? { ...x, pct: m.pct, remDur, status: m.pct >= 100 ? ('Completed' as const) : ('In Progress' as const), actualStart: x.actualStart ?? STATUS_DAY - 1, startOnOrAfter: undefined, dirty: true, changedBy: `TURNPOINT_INT (${m.by})`, changedAt: stampNow() }
+          ? { ...x, pct: m.pct, remDur, status: m.pct >= 100 ? ('Completed' as const) : ('In Progress' as const), actualStart: x.actualStart ?? STATUS_DAY - 1, startOnOrAfter: undefined, dirty: true, changedBy: `OQ_INT (${m.by})`, changedAt: stampNow() }
           : x
       );
-      set({ acts, cpm: schedule(toCpm(acts), STATUS_DAY), dirty: true, connected: true, log: addLog('in', `Progress from TURNPOINT ${m.via}: ${a.id} ${a.name} ${m.pct}% complete (by ${m.by}). Remaining duration ${remDur} d. Schedule (F9) to recalculate.`) });
+      set({ acts, cpm: schedule(toCpm(acts), STATUS_DAY), dirty: true, connected: true, log: addLog('in', `Progress from OQ ${m.via}: ${a.id} ${a.name} ${m.pct}% complete (by ${m.by}). Remaining duration ${remDur} d. Schedule (F9) to recalculate.`) });
       flash([a.id]);
     }
     if (m.type === 'tp.activity.added') {
@@ -233,9 +236,9 @@ export function connectP6(): () => void {
       if (!after || state.acts.some((x) => x.tpId === m.tpId)) return;
       const id = `${after.id.split('-')[0]}-${9000 + state.acts.length}`;
       const before = m.beforeTpId ? state.acts.find((x) => x.tpId === m.beforeTpId) : undefined;
-      const added: P6Activity = { id, tpId: m.tpId, name: m.name, wbs: after.wbs, origDur: m.durationDays, remDur: m.durationDays, pct: 0, status: 'Not Started', preds: [{ id: after.id, lag: 0 }], path: after.path, dirty: true, changedBy: `TURNPOINT_INT (${m.source})`, changedAt: stampNow() };
+      const added: P6Activity = { id, tpId: m.tpId, name: m.name, wbs: after.wbs, origDur: m.durationDays, remDur: m.durationDays, pct: 0, status: 'Not Started', preds: [{ id: after.id, lag: 0 }], path: after.path, dirty: true, changedBy: `OQ_INT (${m.source})`, changedAt: stampNow() };
       const acts = [...state.acts.map((x) => (before && x.id === before.id ? { ...x, preds: [...x.preds, { id, lag: 0 }], dirty: true } : x)), added];
-      set({ acts, cpm: schedule(toCpm(acts), STATUS_DAY), dirty: true, log: addLog('in', `New activity from TURNPOINT (${m.source}): ${id} ${m.name}, ${m.durationDays} d after ${after.id}. Schedule (F9) to recalculate.`) });
+      set({ acts, cpm: schedule(toCpm(acts), STATUS_DAY), dirty: true, log: addLog('in', `New activity from OQ (${m.source}): ${id} ${m.name}, ${m.durationDays} d after ${after.id}. Schedule (F9) to recalculate.`) });
       flash([id]);
     }
   });

@@ -6,10 +6,11 @@ import { SapTab } from './SapTab';
 import { MonitoringTab } from './MonitoringTab';
 import { DryRunTab } from './DryRunTab';
 import { LiveSyncTab } from './LiveSyncTab';
+import { InterfaceInventoryTab } from './InterfaceInventoryTab';
 import { useHub } from './useHub';
 import { errorQueue } from '../../services/integrationService';
 
-const TABS = ['overview', 'live', 'p6', 'sap', 'monitoring', 'dryrun'] as const;
+const TABS = ['overview', 'live', 'p6', 'sap', 'interfaces', 'monitoring', 'dryrun'] as const;
 
 export default function IntegrationHubPage() {
   const [tab, setTab] = useTabParam(TABS, 'overview');
@@ -32,6 +33,7 @@ export default function IntegrationHubPage() {
           { id: 'live', label: 'Live two-way sync' },
           { id: 'p6', label: 'Primavera P6 (XER round trip)' },
           { id: 'sap', label: 'SAP S/4HANA' },
+          { id: 'interfaces', label: 'Interface inventory' },
           { id: 'monitoring', label: 'Monitoring & error handling', badge: errs || undefined },
           { id: 'dryrun', label: 'Dry-run readiness (SOW 16)', badge: 34 },
         ]}
@@ -40,6 +42,7 @@ export default function IntegrationHubPage() {
       {tab === 'live' && <LiveSyncTab />}
       {tab === 'p6' && <P6Tab />}
       {tab === 'sap' && <SapTab />}
+      {tab === 'interfaces' && <InterfaceInventoryTab />}
       {tab === 'monitoring' && <MonitoringTab />}
       {tab === 'dryrun' && <DryRunTab />}
       <p className="small muted" style={{ marginTop: 20 }}>No connection to the client's SAP or P6: the live tab talks to stand-in consoles. See docs/MOCK_VS_REAL.md for what is real and what is simulated.</p>

@@ -10,7 +10,10 @@ import { CostValue } from '../../components/ui/CostValue';
 import { GateStepper } from '../../components/workflow/GateStepper';
 import { IdChips } from '../_shared/IdChips';
 import { approveGate, divertToMaintenance, rejectGate } from '../../services/jobsService';
-import { getGateConfig, setGateEnabled, setGateSla, type GateConfig } from '../../services/scopeService';
+import { approveAllAtGate, decideVariation, fastForwardDemo, formatMoney, getGateConfig, setGateEnabled, setGateSla, type GateConfig } from '../../services/scopeService';
+import { PhaseChip } from './PhaseChip';
+import { ReadinessChecklist } from './ReadinessChecklist';
+import { phaseOf, useReadiness, useScope } from './useScope';
 import { BAND_TONE, riskBand, riskScore } from '../../services/scopeModel';
 import { sapNotificationForJob, sapWoForJob } from '../../mocks/sapKeys';
 import { useRole } from '../../app/RoleContext';
@@ -20,7 +23,10 @@ import type { Job } from '../../types';
 
 const GATE_LABEL = { 1: 'Area Ops Focal Point', 2: 'Head of Area Ops', 3: 'VP Asset Ops' } as const;
 
-export function ApprovalsTab({ jobs, reload }: { jobs: Job[]; reload: () => void }) {
+export function ApprovalsTab({ jobs, reload, goTo }: { jobs: Job[]; reload: () => void; goTo: (tab: string) => void }) {
+  const scope = useScope();
+  const ready = useReadiness(jobs);
+  const [bulk, setBulk] = useState<string | null>(null);
   const { role } = useRole();
   const canEdit = useCanEdit();
   const { showToast } = useToast();
@@ -37,6 +43,14 @@ export function ApprovalsTab({ jobs, reload }: { jobs: Job[]; reload: () => void
 
   async function approve(j: Job) {
     setBusy(j.id);
+    const v = scope.openVarByJob[j.id];
+    if (scope.stage === 'frozen' && v) {
+      const r = await decideVariation(v.id, 'Approved');
+      reload();
+      setBusy(null);
+      showToast(`${v.id} approved: ${r.effect}. Certificate re-issued as Rev ${r.certificate?.revision}.`, 'good');
+      return;
+    }
     const updated = await approveGate(j.id, 'You (Demo User)');
     reload();
     setBusy(null);
@@ -49,6 +63,14 @@ export function ApprovalsTab({ jobs, reload }: { jobs: Job[]; reload: () => void
   }
   async function reject(j: Job) {
     setBusy(j.id);
+    const v = scope.openVarByJob[j.id];
+    if (scope.stage === 'frozen' && v) {
+      await decideVariation(v.id, 'Rejected');
+      reload();
+      setBusy(null);
+      showToast(`${v.id} rejected: ${j.id} stays out of the scope`, 'crit');
+      return;
+    }
     await rejectGate(j.id, 'You (Demo User)');
     reload();
     setBusy(null);
@@ -62,16 +84,33 @@ export function ApprovalsTab({ jobs, reload }: { jobs: Job[]; reload: () => void
     showToast(`${j.id} diverted to routine maintenance (not TA-dependent). It leaves the TA worklist.`, 'accent');
   }
 
+  async function approveGateAll(g: 1 | 2 | 3) {
+    setBulk(`g${g}`);
+    const r = await approveAllAtGate(g);
+    reload();
+    setBulk(null);
+    const held = r.held.length ? ` ${r.held.length} held back (${r.held.map((h) => `${h.id}: ${h.reason}`).join('; ')}).` : '';
+    showToast(`Gate ${g}: ${r.approved} approved${g < 3 ? ` and moved to gate ${g + 1}` : ' and released to SAP (simulated)'}${r.diverted ? `, ${r.diverted} diverted to routine maintenance` : ''}.${held}`, r.held.length ? 'warn' : 'good');
+  }
+  async function fastForward() {
+    setBulk('ff');
+    const r = await fastForwardDemo();
+    reload();
+    setBulk(null);
+    showToast(`Fast-forwarded: ${r.approved} items approved through all three gates${r.estimated ? `, ${r.estimated} budget estimated by AI` : ''}${r.merged ? `, ${r.merged} duplicate merged` : ''}${r.diverted ? `, ${r.diverted} diverted` : ''}, ${r.variationsApproved} pre-freeze variations approved. Ready to freeze.`, 'good');
+  }
+
   const rows = jobs.filter((j) => filter === 'all' || (filter === 'gate1' ? j.status === 'pending' && j.gate === 1 : filter === 'gate2' ? j.status === 'pending' && j.gate === 2 : filter === 'gate3' ? j.status === 'pending' && j.gate === 3 : j.status === filter));
 
   const columns: Column<Job>[] = [
     { key: 'id', header: 'ID', render: (j) => <div><strong className="mono">{j.id}</strong><IdChips sapWo={sapWoForJob(j)} sapNotif={sapNotificationForJob(j)} /></div> },
+    { key: 'phase', header: 'Phase', nosort: true, render: (j) => <PhaseChip phase={phaseOf(j, scope)} /> },
     { key: 'desc', header: 'Description', render: (j) => <div style={{ maxWidth: 260 }}>{j.desc}<div className="small muted">{j.requestedBy} · {j.discipline}</div></div> },
     { key: 'costOMR', header: 'Cost', align: 'right', render: (j) => <span><CostValue amount={j.costOMR} />{g4 && j.costOMR > 250_000 && <div><Chip tone="warn">Needs gate 4 (CPC)</Chip></div>}</span>, sortValue: (j) => j.costOMR },
     { key: 'risk', header: 'Risk', render: (j) => <Chip tone={BAND_TONE[riskBand(riskScore(j))]}>{riskScore(j)}</Chip>, sortValue: (j) => riskScore(j) },
     { key: 'taClass', header: 'TA / Non-TA', render: (j) => <Chip tone={j.taClass === 'TA' ? 'accent' : 'neutral'}>{j.taClass}</Chip> },
     { key: 'gates', header: 'Gate progress', nosort: true, render: (j) => <GateStepper approvals={j.approvals} /> },
-    { key: 'current', header: 'Awaiting', render: (j) => <span className="small">{j.status === 'pending' ? GATE_LABEL[j.gate] : '—'}</span> },
+    { key: 'current', header: 'Awaiting', render: (j) => <span className="small">{j.status === 'pending' ? (scope.openVarByJob[j.id] ? `Variation ${scope.openVarByJob[j.id].id} (${scope.openVarByJob[j.id].approver})` : GATE_LABEL[j.gate]) : '—'}</span> },
     { key: 'status', header: 'Status', render: (j) => <StatusChip status={j.status === 'rejected' && j.taClass === 'Non-TA' ? 'diverted' : j.status} tone={j.status === 'approved' ? 'good' : j.status === 'rejected' ? (j.taClass === 'Non-TA' ? 'neutral' : 'crit') : 'warn'} /> },
     {
       key: 'act',
@@ -101,6 +140,29 @@ export function ApprovalsTab({ jobs, reload }: { jobs: Job[]; reload: () => void
         <StatTile label="At Gate 3" value={String(pending.filter((j) => j.gate === 3).length)} tone="warn" delta="budget and priorities" />
         <StatTile label="Approved" value={String(jobs.filter((j) => j.status === 'approved').length)} tone="good" delta={`${jobs.filter((j) => j.status === 'rejected').length} rejected or diverted`} />
       </div>
+      {scope.stage === 'pre-freeze' ? (
+        <div className="grid grid-3-2" style={{ alignItems: 'start' }}>
+          <Card>
+            <CardHeader title="Approve in bulk" action={<Chip tone="accent">demo accelerators</Chip>} />
+            <p className="small muted" style={{ margin: '-6px 0 10px' }}>One click per gate, or everything at once. Non-TA items are diverted at gate 1; suspected duplicates and items with missing fields are held back for review.</p>
+            <div className="row-wrap">
+              {([1, 2, 3] as const).map((g) => (
+                <ActionButton key={g} variant="primary" small={false} busy={bulk === `g${g}`} disabled={pending.filter((j) => j.gate === g).length === 0} onClick={() => approveGateAll(g)} data-testid={`approve-all-g${g}`}>
+                  Approve all at Gate {g} ({pending.filter((j) => j.gate === g).length})
+                </ActionButton>
+              ))}
+              <ActionButton small={false} busy={bulk === 'ff'} onClick={fastForward} data-testid="ff-approvals">Fast-forward demo (approve all remaining)</ActionButton>
+            </div>
+          </Card>
+          <Card>
+            <ReadinessChecklist readiness={ready} onFix={(id) => goTo(id === 'duplicates' || id === 'fields' ? 'worklist' : id === 'variations' ? 'variations' : 'approvals')} />
+          </Card>
+        </div>
+      ) : (
+        <div className="callout callout-warn">
+          The scope is frozen. New items and changes no longer pass the three gates one by one: each one is a <strong>variation</strong> decided by change control ({formatMoney(scope.variations.filter((v) => v.status === 'Pending' && v.phase === 'Post-freeze').reduce((s, v) => s + v.costOMR, 0))} pending). Approving it re-issues the freeze certificate.
+        </div>
+      )}
       <Card>
         <div className="toolbar">
           <FilterChips options={[{ value: 'gate1', label: 'Gate 1' }, { value: 'gate2', label: 'Gate 2' }, { value: 'gate3', label: 'Gate 3' }, { value: 'approved' }, { value: 'rejected' }]} value={filter} onChange={setFilter} allLabel="All items" />

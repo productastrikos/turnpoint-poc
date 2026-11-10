@@ -140,7 +140,7 @@ export default function AlertsPage() {
         {mail && (
           <div>
             <div className="callout" style={{ marginBottom: 14 }}>
-              Preview of the message OQ mail would deliver for this alert (SOW 4.75). TURNPOINT does not send mail from this demo.
+              Preview of the message the OQ mail system would deliver for this alert (SOW 4.75). This demo does not send mail.
             </div>
             <dl className="mail-meta">
               <dt>From</dt><dd>{mail.preview.from}</dd>

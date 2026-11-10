@@ -152,6 +152,12 @@ export const LOSS_CAUSES = [
 ] as const;
 export type LossCause = (typeof LOSS_CAUSES)[number];
 
+/** Plant and access equipment that is tied up (and billed) while work is redone: PBC 8, "re-work should include equipment along with man-hours". */
+export const REWORK_EQUIPMENT = ['Manlift', 'Scaffolding', 'Mobile crane', 'Welding machine', 'Hydrotest pump'] as const;
+export type ReworkEquipment = (typeof REWORK_EQUIPMENT)[number];
+/** OMR per equipment-hour (hire or crew rate). */
+export const EQUIPMENT_RATE: Record<ReworkEquipment, number> = { Manlift: 18, Scaffolding: 12, 'Mobile crane': 55, 'Welding machine': 6, 'Hydrotest pump': 9 };
+
 export interface LossEvent {
   id: string;
   kind: LossKind;
@@ -165,7 +171,23 @@ export interface LossEvent {
   costOMR: number;
   reportedBy: string;
   note: string;
+  /** Equipment used again for the re-work, and for how long. Absent for delays and for re-work that needed none. */
+  equipment?: ReworkEquipment;
+  equipHours?: number;
+  equipCostOMR?: number;
 }
+
+// Equipment tied up by each seeded re-work event, keyed by P6 activity: [equipment, equipment-hours]
+const REWORK_EQUIP: Record<string, [ReworkEquipment, number]> = {
+  'HCU-2010': ['Manlift', 14],
+  'SRU-1010': ['Scaffolding', 16],
+  'CDU-3010': ['Mobile crane', 10],
+  'PR4-1010': ['Scaffolding', 44],
+  'CDU-1020': ['Scaffolding', 38],
+  'CDU-2040': ['Welding machine', 40],
+  'HCU-2020': ['Manlift', 26],
+  'FLR-2010': ['Hydrotest pump', 8],
+};
 
 // [kind, day, activity, p6Id, discipline, contractor, cause, hours, reportedBy, note]
 type LR = [LossKind, number, string, string, string, string, LossCause, number, string, string];
@@ -210,4 +232,5 @@ export const lossEvents: LossEvent[] = lr.map((r, i) => ({
   costOMR: Math.round(r[7] * 14.5),
   reportedBy: r[8],
   note: r[9],
+  ...(r[0] === 'Rework' && REWORK_EQUIP[r[3]] ? { equipment: REWORK_EQUIP[r[3]][0], equipHours: REWORK_EQUIP[r[3]][1], equipCostOMR: REWORK_EQUIP[r[3]][1] * EQUIPMENT_RATE[REWORK_EQUIP[r[3]][0]] } : {}),
 }));

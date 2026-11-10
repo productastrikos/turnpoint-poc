@@ -14,7 +14,12 @@ import { Modal } from '../../components/ui/Modal';
 import { LoadingState } from '../../components/ui/EmptyState';
 import { Stepper } from '../../components/workflow/Stepper';
 import { TABS } from '../../app/tabRegistry';
-import { act, allRemarks, availableActions, incomplete, listExchangers, listItps, recordPoint, summarise, type Action, type RemarkRow } from '../../services/qaqcService';
+import { act, actorOf, advanceClock, allRemarks, availableActions, fastForward, getPoState, incomplete, issueDemoPo, listExchangers, listItps, poMetrics, recordPoint, resetPoDemo, simulateFailure, summarise, type Action, type PoResult, type PoState, type RemarkRow } from '../../services/qaqcService';
+import { WorkflowTab } from './WorkflowTab';
+import { PoTable } from './PoTable';
+import { PoTopBlock } from './PoTopBlock';
+import { PoDrawer } from './PoDrawer';
+import './qaqc.css';
 import { STAGES, SUBTYPE_COMPONENTS, type CellState, type Exchanger, type Itp, type StageId } from '../../mocks/qaqcMock';
 import { useRole } from '../../app/RoleContext';
 import { useCanEdit } from '../../app/AccessContext';
@@ -38,10 +43,10 @@ function downloadCsv(name: string, rows: Record<string, string>[]) {
 }
 
 export default function QaqcPage() {
-  const { persona } = useRole();
+  const { persona, role } = useRole();
   const canEdit = useCanEdit();
   const { showToast } = useToast();
-  const [tab, setTab] = useTabParam(TABS.qaqc, 'inspections');
+  const [tab, setTab] = useTabParam(TABS.qaqc, 'workflow');
   const [list, setList] = useState<Exchanger[] | null>(null);
   const [itps, setItps] = useState<Itp[]>([]);
   const [quick, setQuick] = useState('all');
@@ -52,13 +57,18 @@ export default function QaqcPage() {
   const [err, setErr] = useState('');
   const [report, setReport] = useState(false);
   const [rq, setRq] = useState('');
+  const [po, setPo] = useState<PoState | null>(null);
+  const [stage, setStage] = useState('all');
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const [poBusy, setPoBusy] = useState(false);
 
   const canClear = ['ta-manager', 'inspection'].includes(persona.id);
 
   const load = useCallback(async () => {
-    const [e, i] = await Promise.all([listExchangers(), listItps()]);
+    const [e, i, ps] = await Promise.all([listExchangers(), listItps(), getPoState()]);
     setList(e);
     setItps(i);
+    setPo(ps);
   }, []);
   useEffect(() => {
     load();
@@ -109,7 +119,24 @@ export default function QaqcPage() {
     showToast(`${i.id}: inspection point recorded`, 'good');
   }
 
-  if (!list) return <div><PageHeader title="QA/QC & ITP" subtitle="" checklist="P5 · P9" /><LoadingState /></div>;
+  const actor = actorOf(persona);
+  const showValue = role !== 'contractor';
+  const metrics = po ? poMetrics(po.pos, po.today) : null;
+  const focus = po?.pos.find((x) => x.id === focusId) ?? null;
+
+  async function poDone(r: PoResult) {
+    if (r.po) setFocusId(r.po.id);
+    await load();
+    showToast(r.ok ? r.message ?? 'Done' : r.error ?? 'Not allowed', r.ok ? r.tone ?? 'good' : 'crit');
+  }
+  async function poRun(fn: () => Promise<PoResult>) {
+    setPoBusy(true);
+    const r = await fn();
+    setPoBusy(false);
+    await poDone(r);
+  }
+
+  if (!list || !po || !metrics) return <div><PageHeader title="QA/QC & ITP" subtitle="" checklist="P5 · P9" /><LoadingState /></div>;
 
   const cellOf = (e: Exchanger, comp: string, stage: StageId) => e.components.find((c) => c.name === comp)!.stages[stage];
   const stepCell = current && step ? cellOf(current, step.comp, step.stage) : null;
@@ -123,7 +150,34 @@ export default function QaqcPage() {
         subtitle="Digital inspection workflow for heat exchangers from pre-cleaning to final inspection, tracked per component with stage control, role-based clearance, signatures, remarks and rework at every stage. ITP tracking starts when the PO is issued."
         checklist="P5 · P9 · SOW dry run 15-24"
       />
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'inspections', label: 'Exchanger inspections' }, { id: 'itp', label: 'ITP tracking (after PO)', badge: itps.length }, { id: 'remarks', label: 'Remarks register', badge: remarkRows.length }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'workflow', label: 'Workflow' }, { id: 'po-itp', label: 'PO & ITP tracking', badge: po.pos.length }, { id: 'inspections', label: 'Exchanger inspections' }, { id: 'itp', label: 'ITP points (all POs)', badge: itps.length }, { id: 'remarks', label: 'Remarks register', badge: remarkRows.length }]} />
+
+      {(tab === 'workflow' || tab === 'po-itp') && (
+        <div className="stack" style={{ gap: 16 }}>
+          <PoTopBlock
+            metrics={metrics}
+            today={po.today}
+            focus={focus}
+            busy={poBusy}
+            onIssue={() => poRun(issueDemoPo)}
+            onFastForward={() => focus && poRun(() => fastForward(focus.id))}
+            onFail={() => focus && poRun(() => simulateFailure(focus.id))}
+            onReset={async () => { await resetPoDemo(); setFocusId(null); setStage('all'); await load(); showToast('QA/QC demo reset to the seeded pipeline', 'accent'); }}
+            onClock={async () => { await advanceClock(3); await load(); showToast('Demo date moved 3 days forward. SLA clocks updated.', 'accent'); }}
+            onOpen={(id) => { setFocusId(id); setSel(null); }}
+            onEscalate={async (id) => showToast(`ITP review for PO ${id} escalated to the QA/QC lead (simulated e-mail sent)`, 'accent')}
+          />
+          {tab === 'workflow' ? (
+            <WorkflowTab pos={po.pos} metrics={metrics} today={po.today} stage={stage} onStage={setStage} focusId={focusId} activeKey={focusId} onOpen={setFocusId} showValue={showValue} />
+          ) : (
+            <Card>
+              <CardHeader title={`Purchase orders and their ITPs (${po.pos.length})`} />
+              <p className="small muted" style={{ margin: '-6px 0 10px' }}>ITP tracking starts the day the PO is issued: ITP requested, submitted, reviewed, points released, then acceptance. Click a PO to act on its current step.</p>
+              <PoTable rows={po.pos} today={po.today} showValue={showValue} activeKey={focusId} focusId={focusId} onOpen={setFocusId} />
+            </Card>
+          )}
+        </div>
+      )}
 
       {tab === 'inspections' && (
         <div className="stack" style={{ gap: 16 }}>
@@ -229,6 +283,7 @@ export default function QaqcPage() {
         </Card>
       )}
 
+      <PoDrawer po={focus && (tab === 'workflow' || tab === 'po-itp') ? focus : null} actor={actor} showValue={showValue} canEdit={canEdit} onClose={() => setFocusId(null)} onDone={poDone} />
       <Drawer open={Boolean(current)} onClose={() => { setSel(null); setStep(null); }} width={820} title={current ? `${current.id} · ${current.name}` : ''} subtitle={current ? `${current.subtype} · ${areaLabel(current.area)} · ${current.contractor}` : ''}
         footer={current ? <><span className="small muted" style={{ marginRight: 'auto' }}>Signing as {persona.person} ({persona.label}){canClear ? '' : ' · cannot give clearance'}</span><button className="btn" disabled={!allCleared} title={allCleared ? '' : 'Available when every stage is cleared'} onClick={() => setReport(true)}>Print inspection report</button></> : undefined}>
         {current && (

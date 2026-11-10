@@ -3,7 +3,7 @@ import { AssistantChat } from '../ai/assistant/AssistantChat';
 import { Icon } from './icons';
 import { useLang } from '../i18n/lang';
 
-/** Assistant side panel (checklist G13), opened from the header. Claude with tools when a key is set, else on-device. */
+/** S!a side panel (checklist G13), opened from the header. Claude with tools when a key is set, else on-device. */
 export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useLang();
   useEffect(() => {
@@ -15,10 +15,10 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
   if (!open) return null;
   return (
-    <aside className="chat-panel no-print" role="dialog" aria-label="TURNPOINT assistant">
+    <aside className="chat-panel no-print" role="dialog" aria-label="S!a">
       <div className="chat-head">
-        <strong>{t('Ask TURNPOINT')}</strong>
-        <button className="icon-btn" onClick={onClose} aria-label="Close assistant">
+        <strong>{t('S!a')}</strong>
+        <button className="icon-btn" onClick={onClose} aria-label="Close S!a">
           <Icon name="close" size={16} />
         </button>
       </div>

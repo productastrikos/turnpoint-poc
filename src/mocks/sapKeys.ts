@@ -4,11 +4,16 @@ import { unitOf } from './master';
 
 const jobNum = (id: string) => Number(id.replace(/\D/g, '')) || 0;
 
-/** SAP maintenance order (work order) number. Approved/frozen jobs always have one; others only if they came from SAP as a work order. */
+/**
+ * SAP maintenance order (work order) number.
+ * - A SAP work order keeps its own number.
+ * - An item that came from a SAP notification gets its order when it is approved.
+ * - An item created in OQ (manual entry, bulk upload, Excel import) gets its order in SAP the moment it is created.
+ */
 export function sapWoForJob(job: Pick<Job, 'id' | 'source' | 'sapRef' | 'inBaseline' | 'status'>): string | undefined {
   if (job.source === 'SAP work order' && job.sapRef) return job.sapRef;
-  if (job.inBaseline || job.status === 'approved') return `400003${String(1000 + jobNum(job.id))}`;
-  return undefined;
+  if (job.source === 'SAP notification') return job.inBaseline || job.status === 'approved' ? `400003${String(1000 + jobNum(job.id))}` : undefined;
+  return `400003${String(1000 + jobNum(job.id))}`;
 }
 
 /** SAP maintenance notification number if the job originated from one. */

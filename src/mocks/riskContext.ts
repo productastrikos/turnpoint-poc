@@ -1,6 +1,6 @@
 // Links from each critical / near-critical activity to the records that bear on its risk: discovery jobs and NCRs on
 // the same equipment, risk-register entries, crew, and constraints the field has reported. In production these links
-// come from the equipment / functional-location keys shared by P6, SAP and TURNPOINT; here they are seeded.
+// come from the equipment / functional-location keys shared by P6, SAP and OQ; here they are seeded.
 // The prediction service reads the linked records LIVE (a closed NCR or a mitigated risk stops counting).
 
 export interface ActivityContext {
