@@ -23,13 +23,17 @@ answers on-device and the SAP tab stays in demo mode.
   `ANTHROPIC_API_KEY` unset on the server if that is not acceptable; the demo then runs on the on-device assistant.
 
 ## Login
-Demo sign-in screen, credentials pre-filled (`admin` / `Turnpoint2026!`; other roles: `steerco`, `planner`, `inspection`,
-`hse`, `contractor`, same password). It is a demo gate in the client bundle, **not security**. Do not put real data behind it.
+Sign-in is switched off: the app opens straight away as the TA Event Manager (see `src/App.tsx`). The login screen
+(`src/app/LoginPage.tsx`, demo password in `src/app/auth.ts`) is kept for when it is needed again. Use the "View as" switch in
+the top bar to see the other roles. The role gate is a demo, **not security**: do not put real data behind it.
 The UI has an English / Arabic switch (shell only, see README > Language); the Arabic font is bundled, no CDN.
+The SAP and P6 stand-ins (`/ext/sap`, `/ext/p6`, `/ext/split`) and the SAP side-by-side dock are routes of the same SPA, so the
+`-s` (single-page fallback) flag on `serve` is required.
 
 ## Commands
+Prerequisites on the server: Node 20.12+, and `npm i -g pm2 serve` once.
 ```bash
-git clone <repo> turnpoint && cd turnpoint
+git clone https://github.com/productastrikos/turnpoint-poc.git turnpoint && cd turnpoint
 
 # Frontend
 npm install && npm run build                       # tsc -b + vite build -> dist/
@@ -92,4 +96,4 @@ curl -k https://turnpoint.astrikos.xyz:8443                       # SPA HTML
 curl -k https://turnpoint-api.astrikos.xyz:8443/                  # {"service":"turnpoint-backend","ok":true,...}
 curl -k https://turnpoint-api.astrikos.xyz:8443/api/relay/status  # {"anthropic":false|true,...}
 ```
-Then open the frontend, press Sign in, and ask the assistant a question (badge shows Live AI or On-device AI).
+Then open the frontend (it opens straight into the app), click **SAP side by side**, and ask the assistant a question (badge shows Live AI or On-device AI).

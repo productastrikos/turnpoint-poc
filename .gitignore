@@ -28,3 +28,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Demo video scratch and heavy outputs (final_v3 is tracked)
+demo-videos/final/
+demo-videos/final_dark/
+demo-videos/audio/
+demo-videos/audio_gemini/
+demo-videos/raw/
+demo-videos/out/
